@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.accountbook</groupId>
+        <artifactId>account-book</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>ab-app</artifactId>
+    <name>ab-app</name>
+    <description>Assembly: boots all modules, hosts the H5 frontend and Nacos/yml configuration</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.accountbook</groupId>
+            <artifactId>ab-merchant</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.accountbook</groupId>
+            <artifactId>ab-product</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.accountbook</groupId>
+            <artifactId>ab-ocr</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.accountbook</groupId>
+            <artifactId>ab-receipt</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.accountbook</groupId>
+            <artifactId>ab-analytics</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>account-book</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

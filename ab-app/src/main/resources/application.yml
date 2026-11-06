@@ -1,0 +1,65 @@
+spring:
+  application:
+    name: account-book
+  config:
+    # "optional:" => if Nacos is unreachable or has no such dataId, the app starts with this file alone.
+    import: "optional:nacos:${spring.application.name}.yml"
+  cloud:
+    nacos:
+      config:
+        enabled: ${NACOS_ENABLED:true}
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        username: ${NACOS_USERNAME:}
+        password: ${NACOS_PASSWORD:}
+        file-extension: yml
+        timeout: 2000
+        refresh-enabled: false
+        import-check:
+          enabled: false
+  flyway:
+    enabled: false # migrations are run per module by ModuleMigrator
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true
+
+server:
+  port: ${PORT:8080}
+  compression:
+    enabled: true
+    mime-types: application/json,text/css,application/javascript,text/html,image/svg+xml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  health:
+    # Nacos is optional (falls back to local config); its absence must not turn the app's health DOWN.
+    nacos-config:
+      enabled: false
+
+ab:
+  data-dir: ${AB_DATA_DIR:./data}
+  default-currency: JPY
+  currencies: [JPY, CNY, TWD, USD, EUR]
+  db:
+    pool-size: 8
+    busy-timeout-ms: 5000
+  ocr:
+    provider: auto # auto: llm when api-key is set, otherwise mock
+    llm:
+      base-url: ${AB_OCR_BASE_URL:https://api.openai.com/v1}
+      api-key: ${AB_OCR_API_KEY:}
+      model: ${AB_OCR_MODEL:gpt-4o-mini}
+
+logging:
+  level:
+    com.alibaba.nacos: WARN
