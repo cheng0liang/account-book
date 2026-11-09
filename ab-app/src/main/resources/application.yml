@@ -54,11 +54,13 @@ ab:
     pool-size: 8
     busy-timeout-ms: 5000
   ocr:
-    provider: auto # auto: llm when api-key is set, otherwise mock
+    provider: auto # auto: llm when api-key is set, otherwise mock (fixed sample data, reads no image)
+    # Default backend: Alibaba Tongyi (DashScope, OpenAI-compatible). Only AB_OCR_API_KEY is needed; any other
+    # OpenAI-compatible vision endpoint works by overriding BASE_URL and MODEL.
     llm:
-      base-url: ${AB_OCR_BASE_URL:https://api.openai.com/v1}
+      base-url: ${AB_OCR_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
       api-key: ${AB_OCR_API_KEY:}
-      model: ${AB_OCR_MODEL:gpt-4o-mini}
+      model: ${AB_OCR_MODEL:qwen-vl-plus}
   auth:
     # dev-mode: SMS codes are returned in the API response (no gateway) and providers without credentials use a
     # local mock sign-in. MUST be false (AB_AUTH_DEV=false) in any deployment reachable by others.

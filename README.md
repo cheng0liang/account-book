@@ -14,7 +14,7 @@ mvn -pl ab-app -am clean package
 java -jar ab-app/target/account-book.jar      # http://localhost:8080
 ```
 
-不配置 OCR key 时使用模拟识别；配置方式、Nacos、测试命令见 [quickstart](specs/001-receipt-price-tracker/quickstart.md)。
+OCR 默认使用阿里通义 `qwen-vl-plus`：`export AB_OCR_API_KEY=<百炼 key>` 即可；未配置 key 时使用固定的模拟数据（不读取图片）；配置方式、Nacos、测试命令见 [quickstart](specs/001-receipt-price-tracker/quickstart.md)。
 
 ## 模块
 
