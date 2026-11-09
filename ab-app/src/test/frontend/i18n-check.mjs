@@ -20,6 +20,11 @@ const ENUMS = {
   priceUnit: ['item', '100g', '100ml'],
   warning: ['merchant_not_matched'],
   metric: ['avg', 'min', 'max'],
+  gender: ['UNKNOWN', 'MALE', 'FEMALE', 'OTHER'],
+  provider: ['phone', 'apple', 'google', 'wechat', 'qq', 'line'],
+  'family.role': ['OWNER', 'MEMBER'],
+  'login.err': ['state', 'denied', 'bound_other', 'failed'],
+  'login.loc': ['unsupported', 'denied', 'unavailable', 'timeout'],
 };
 
 const problems = [];

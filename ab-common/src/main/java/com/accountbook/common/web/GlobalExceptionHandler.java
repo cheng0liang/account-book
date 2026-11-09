@@ -81,10 +81,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     static String codeOf(HttpStatusCode status) {
         return switch (status.value()) {
             case 400 -> "VALIDATION_FAILED";
+            case 401 -> "UNAUTHORIZED";
+            case 403 -> "FORBIDDEN";
             case 404 -> "NOT_FOUND";
             case 405 -> "METHOD_NOT_ALLOWED";
             case 409 -> "CONFLICT";
             case 413 -> "PAYLOAD_TOO_LARGE";
+            case 429 -> "TOO_MANY_REQUESTS";
             case 415 -> "UNSUPPORTED_MEDIA_TYPE";
             default -> "INTERNAL_ERROR";
         };

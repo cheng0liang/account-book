@@ -5,6 +5,8 @@ import { barChart } from '../charts/barChart.js';
 import * as api from '../api.js';
 import { t, tOr } from '../i18n/index.js';
 import { getCurrency } from '../store.js';
+import { scopeSwitch } from '../ui/scope.js';
+import { getScope } from '../scope.js';
 import { fmtMoney, fmtMonthTitle, fmtDayHeader, fmtTime, monthRange, fmtAxisLabel } from '../format.js';
 
 const PAGE_SIZE = 20;
@@ -19,6 +21,7 @@ export function render(ctx) {
   const groups = h('section', { class: 'receipt-groups' });
   const moreBtn = h('button', { class: 'btn block', type: 'button', hidden: true, onClick: () => loadMore() }, t('common.loadMore'));
   const root = h('div', { class: 'page home' },
+    scopeSwitch(),
     h('header', { class: 'month-bar' }, prev, title, next), summary, groups, moreBtn);
 
   let reqId = 0;
@@ -78,11 +81,12 @@ export function render(ctx) {
   function row(r) {
     const items = (r.firstItems || []).join(' / ');
     const more = r.itemCount > (r.firstItems || []).length ? ` ${t('home.moreItems', { n: r.itemCount - r.firstItems.length })}` : '';
+    const who = getScope() === 'family' && r.owner ? (r.owner.nickname || t('family.unknownMember')) : null;
     return h('a', { class: 'receipt-row', href: `#/receipt/${r.id}` },
       h('div', { class: 'row-main' },
         h('div', { class: 'row-title' }, r.merchantName),
         h('div', { class: 'row-sub' }, items + more),
-        h('div', { class: 'row-meta' }, [fmtTime(r.purchasedAt), r.paymentMethod ? tOr(`payment.${r.paymentMethod}`, r.paymentMethod) : null].filter(Boolean).join(' · '))),
+        h('div', { class: 'row-meta' }, [who, fmtTime(r.purchasedAt), r.paymentMethod ? tOr(`payment.${r.paymentMethod}`, r.paymentMethod) : null].filter(Boolean).join(' · '))),
       h('div', { class: 'row-amount' }, fmtMoney(r.totalAmount, r.currency)));
   }
 

@@ -85,8 +85,10 @@ export async function render(ctx) {
   if (ctx.reused && session?.key === key) {
     ({ form, rec } = session);
   } else {
-    if (isEdit) form = toForm(await api.getReceipt(ctx.params.id));
-    else {
+    if (isEdit) {
+      form = toForm(await api.getReceipt(ctx.params.id));
+      if (form.imageUrl) form.imageUrl = await api.fetchBlobUrl(form.imageUrl).catch(() => null);
+    } else {
       rec = takeRecognition();
       form = toForm(rec?.draft || {}, rec);
     }

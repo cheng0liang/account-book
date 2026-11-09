@@ -19,7 +19,8 @@ record ReceiptForm(
         String source,
         String imageToken,
         String imageUrl,
-        @Valid List<ItemForm> items) {
+        @Valid List<ItemForm> items,
+        OwnerRef owner) {
 
     record MerchantRef(
             Long id,

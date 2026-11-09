@@ -12,7 +12,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 class ProjectionRepository {
 
-    record Bucket(String date, String currency, long merchantId, long productId) {
+    record Bucket(long userId, String date, String currency, long merchantId, long productId) {
     }
 
     private final JdbcClient jdbc;
@@ -64,10 +64,11 @@ class ProjectionRepository {
 
     List<Bucket> bucketsOfReceipt(long receiptId) {
         return jdbc.sql("""
-                SELECT DISTINCT purchased_date, currency, merchant_id, product_id
+                SELECT DISTINCT user_id, purchased_date, currency, merchant_id, product_id
                 FROM ana_price_fact WHERE receipt_id = :id""")
                 .param("id", receiptId)
-                .query((rs, i) -> new Bucket(rs.getString(1), rs.getString(2), rs.getLong(3), rs.getLong(4))).list();
+                .query((rs, i) -> new Bucket(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getLong(4),
+                        rs.getLong(5))).list();
     }
 
     void deleteFacts(long receiptId) {
@@ -78,10 +79,10 @@ class ProjectionRepository {
         for (ReceiptItemFact it : f.items()) {
             double unit = it.quantity() > 0 ? it.amountMinor() / it.quantity() : it.unitPriceMinor();
             jdbc.sql("""
-                    INSERT INTO ana_price_fact (receipt_id, purchased_date, currency, merchant_id, product_id,
+                    INSERT INTO ana_price_fact (receipt_id, user_id, purchased_date, currency, merchant_id, product_id,
                                                 quantity, unit_minor, amount_minor)
-                    VALUES (:r, :d, :c, :m, :p, :q, :u, :a)""")
-                    .param("r", f.id()).param("d", f.purchasedDate()).param("c", f.currency())
+                    VALUES (:r, :uid, :d, :c, :m, :p, :q, :u, :a)""")
+                    .param("r", f.id()).param("uid", f.userId()).param("d", f.purchasedDate()).param("c", f.currency())
                     .param("m", f.merchantId()).param("p", it.productId()).param("q", it.quantity())
                     .param("u", unit).param("a", it.amountMinor()).update();
         }
@@ -91,23 +92,29 @@ class ProjectionRepository {
         for (Bucket b : buckets) {
             jdbc.sql("""
                     DELETE FROM ana_price_daily
-                    WHERE purchased_date = :d AND currency = :c AND merchant_id = :m AND product_id = :p""")
-                    .param("d", b.date()).param("c", b.currency()).param("m", b.merchantId())
+                    WHERE user_id = :u AND purchased_date = :d AND currency = :c AND merchant_id = :m AND product_id = :p""")
+                    .param("u", b.userId()).param("d", b.date()).param("c", b.currency()).param("m", b.merchantId())
                     .param("p", b.productId()).update();
-            jdbc.sql(DAILY_SELECT + " AND purchased_date = :d AND currency = :c AND merchant_id = :m AND product_id = :p"
-                            + DAILY_GROUP)
-                    .param("d", b.date()).param("c", b.currency()).param("m", b.merchantId())
+            jdbc.sql(DAILY_SELECT + " AND user_id = :u AND purchased_date = :d AND currency = :c AND merchant_id = :m"
+                            + " AND product_id = :p" + DAILY_GROUP)
+                    .param("u", b.userId()).param("d", b.date()).param("c", b.currency()).param("m", b.merchantId())
                     .param("p", b.productId()).update();
         }
     }
 
     private static final String DAILY_SELECT = """
-            INSERT INTO ana_price_daily (product_id, merchant_id, currency, purchased_date, n, qty, amount_minor,
+            INSERT INTO ana_price_daily (user_id, product_id, merchant_id, currency, purchased_date, n, qty, amount_minor,
                                          min_unit, max_unit, sum_unit)
-            SELECT product_id, merchant_id, currency, purchased_date, COUNT(*), SUM(quantity), SUM(amount_minor),
+            SELECT user_id, product_id, merchant_id, currency, purchased_date, COUNT(*), SUM(quantity), SUM(amount_minor),
                    MIN(unit_minor), MAX(unit_minor), SUM(unit_minor)
             FROM ana_price_fact WHERE 1 = 1""";
-    private static final String DAILY_GROUP = " GROUP BY product_id, merchant_id, currency, purchased_date";
+    private static final String DAILY_GROUP = " GROUP BY user_id, product_id, merchant_id, currency, purchased_date";
+
+    /** Re-homes rows projected from receipts that predate login (user 0) onto the first registered user. */
+    void claimLegacy(long userId) {
+        jdbc.sql("UPDATE ana_price_fact SET user_id = :u WHERE user_id = 0").param("u", userId).update();
+        jdbc.sql("UPDATE ana_price_daily SET user_id = :u WHERE user_id = 0").param("u", userId).update();
+    }
 
     void clearAll() {
         jdbc.sql("DELETE FROM ana_price_daily").update();

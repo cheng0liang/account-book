@@ -5,6 +5,9 @@ import { createTabbar } from './ui/tabbar.js';
 import { closeAllOverlays } from './ui/modal.js';
 import { skeleton, errorBlock } from './ui/layout.js';
 import { clear } from './ui/dom.js';
+import { isLoggedIn } from './auth.js';
+import { setFamily, onScopeChange } from './scope.js';
+import * as api from './api.js';
 
 addRoute('/home', () => import('./pages/home.js'), { tab: 'home' });
 addRoute('/scan', () => import('./pages/scan.js'), { tab: 'scan' });
@@ -17,6 +20,9 @@ addRoute('/merchant/new', () => import('./pages/merchant-edit.js'), { tab: 'libr
 addRoute('/merchant/:id', () => import('./pages/merchant-edit.js'), { tab: 'library', hideTabbar: true });
 addRoute('/product/new', () => import('./pages/product-edit.js'), { tab: 'library', hideTabbar: true });
 addRoute('/product/:id', () => import('./pages/product-edit.js'), { tab: 'library', hideTabbar: true });
+addRoute('/login', () => import('./pages/login.js'), { tab: 'settings', hideTabbar: true });
+addRoute('/profile', () => import('./pages/profile.js'), { tab: 'settings' });
+addRoute('/family', () => import('./pages/family.js'), { tab: 'settings' });
 addRoute('/settings', () => import('./pages/settings.js'), { tab: 'settings' });
 
 const app = document.getElementById('app');
@@ -39,6 +45,9 @@ async function show(reused) {
   const found = matchRoute(path);
   if (!found) { location.replace('#/home'); return; }
   const { route, params } = found;
+  const loggedIn = isLoggedIn();
+  if (!loggedIn && path !== '/login') { location.replace('#/login'); return; }
+  if (loggedIn && path === '/login' && !query.ticket && !query.error) { location.replace('#/home'); return; }
   tabbar.setActive(route.tab);
   tabbar.el.hidden = Boolean(route.hideTabbar);
   document.body.classList.toggle('no-tabbar', Boolean(route.hideTabbar));
@@ -46,7 +55,7 @@ async function show(reused) {
 
   try {
     const mod = await route.load();
-    const node = await mod.render({ params, query, reused, onCleanup: (fn) => local.push(fn) });
+    const node = await mod.render({ params, query, reused, onCleanup: (fn) => local.push(fn), reload: () => show(true) });
     if (my !== token) { local.forEach((fn) => fn()); return; }
     clear(view).append(node);
     window.scrollTo(0, reused ? scrollY : 0);
@@ -64,6 +73,10 @@ function applyLang() {
 async function boot() {
   applyLang();
   await Promise.race([loadMeta(), new Promise((resolve) => setTimeout(resolve, 3000))]);
+  if (isLoggedIn()) {
+    try { setFamily(await api.myFamily()); } catch { setFamily(null); }
+  }
+  onScopeChange(() => show(true));
   onLangChange(() => {
     applyLang();
     tabbar.refresh();

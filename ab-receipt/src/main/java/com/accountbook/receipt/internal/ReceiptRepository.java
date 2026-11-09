@@ -20,19 +20,19 @@ import org.springframework.stereotype.Repository;
 class ReceiptRepository {
 
     private static final int FACT_BATCH = 500;
-    private static final String COLUMNS = "id, merchant_id, merchant_name, purchased_at, purchased_date, currency, "
-            + "total_minor, tax_minor, discount_minor, payment_method, note, source, image_path, item_count";
+    private static final String COLUMNS = "id, user_id, merchant_id, merchant_name, purchased_at, purchased_date, "
+            + "currency, total_minor, tax_minor, discount_minor, payment_method, note, source, image_path, item_count";
 
-    record Row(long id, long merchantId, String merchantName, String purchasedAt, String purchasedDate, String currency,
-               long totalMinor, Long taxMinor, long discountMinor, String paymentMethod, String note, String source,
-               String imagePath, int itemCount) {
+    record Row(long id, long userId, long merchantId, String merchantName, String purchasedAt, String purchasedDate,
+               String currency, long totalMinor, Long taxMinor, long discountMinor, String paymentMethod, String note,
+               String source, String imagePath, int itemCount) {
     }
 
     record ItemRow(long id, long receiptId, long productId, String productName, double quantity, long unitPriceMinor,
                    long discountMinor, long amountMinor, String note) {
     }
 
-    record NewReceipt(long merchantId, String merchantName, String purchasedAt, String purchasedDate, String currency,
+    record NewReceipt(long userId, long merchantId, String merchantName, String purchasedAt, String purchasedDate, String currency,
                       long totalMinor, Long taxMinor, long discountMinor, String paymentMethod, String note,
                       String source, String imagePath, int itemCount) {
     }
@@ -41,7 +41,7 @@ class ReceiptRepository {
                    long amountMinor, String note) {
     }
 
-    private static final RowMapper<Row> ROW = (rs, i) -> new Row(rs.getLong("id"), rs.getLong("merchant_id"),
+    private static final RowMapper<Row> ROW = (rs, i) -> new Row(rs.getLong("id"), rs.getLong("user_id"), rs.getLong("merchant_id"),
             rs.getString("merchant_name"), rs.getString("purchased_at"), rs.getString("purchased_date"),
             rs.getString("currency"), rs.getLong("total_minor"), nullableLong(rs, "tax_minor"),
             rs.getLong("discount_minor"), rs.getString("payment_method"), rs.getString("note"),
@@ -69,14 +69,16 @@ class ReceiptRepository {
 
     long insert(NewReceipt r, long now) {
         return jdbc.sql("""
-                INSERT INTO rcp_receipt (merchant_id, merchant_name, purchased_at, purchased_date, currency,
+                INSERT INTO rcp_receipt (user_id, merchant_id, merchant_name, purchased_at, purchased_date, currency,
                        total_minor, tax_minor, discount_minor, payment_method, note, source, image_path, item_count,
                        created_at, updated_at)
-                VALUES (:mid, :mname, :at, :date, :cur, :total, :tax, :disc, :pay, :note, :src, :img, :cnt, :now, :now)
+                VALUES (:uid, :mid, :mname, :at, :date, :cur, :total, :tax, :disc, :pay, :note, :src, :img, :cnt,
+                        :now, :now)
                 RETURNING id""")
                 .params(params(r)).param("now", now).query(Long.class).single();
     }
 
+    /** Updates everything except the owner: a receipt never changes hands. */
     void update(long id, NewReceipt r, long now) {
         jdbc.sql("""
                 UPDATE rcp_receipt SET merchant_id = :mid, merchant_name = :mname, purchased_at = :at,
@@ -106,6 +108,10 @@ class ReceiptRepository {
         return jdbc.sql("DELETE FROM rcp_receipt WHERE id = :id").param("id", id).update() > 0;
     }
 
+    int claimLegacy(long userId) {
+        return jdbc.sql("UPDATE rcp_receipt SET user_id = :uid WHERE user_id = 0").param("uid", userId).update();
+    }
+
     void renameMerchant(long merchantId, String name) {
         jdbc.sql("UPDATE rcp_receipt SET merchant_name = :n WHERE merchant_id = :id AND merchant_name <> :n")
                 .param("n", name).param("id", merchantId).update();
@@ -116,10 +122,12 @@ class ReceiptRepository {
                 .param("n", name).param("id", productId).update();
     }
 
-    record Filter(String from, String to, Long merchantId, String like) {
+    /** {@code userIds} is always set: every listing is scoped to the caller or their family. */
+    record Filter(Collection<Long> userIds, String from, String to, Long merchantId, String like) {
 
         Map<String, Object> params() {
             Map<String, Object> m = new HashMap<>();
+            m.put("uids", userIds);
             if (from != null) {
                 m.put("from", from);
             }
@@ -137,6 +145,7 @@ class ReceiptRepository {
 
         String where() {
             List<String> c = new ArrayList<>();
+            c.add("user_id IN (:uids)");
             if (from != null) {
                 c.add("purchased_date >= :from");
             }
@@ -150,7 +159,7 @@ class ReceiptRepository {
                 c.add("(merchant_name LIKE :q ESCAPE '\\' OR EXISTS (SELECT 1 FROM rcp_receipt_item i "
                         + "WHERE i.receipt_id = rcp_receipt.id AND i.product_name LIKE :q ESCAPE '\\'))");
             }
-            return c.isEmpty() ? "" : " WHERE " + String.join(" AND ", c);
+            return " WHERE " + String.join(" AND ", c);
         }
     }
 
@@ -204,7 +213,7 @@ class ReceiptRepository {
     }
 
     static ReceiptFact toFact(Row r, List<ReceiptItemFact> items) {
-        return new ReceiptFact(r.id(), r.merchantId(), r.purchasedAt(), r.purchasedDate(), r.currency(),
+        return new ReceiptFact(r.id(), r.userId(), r.merchantId(), r.purchasedAt(), r.purchasedDate(), r.currency(),
                 r.totalMinor(), r.discountMinor(), items);
     }
 
@@ -215,6 +224,7 @@ class ReceiptRepository {
 
     private static Map<String, Object> params(NewReceipt r) {
         Map<String, Object> m = new HashMap<>();
+        m.put("uid", r.userId());
         m.put("mid", r.merchantId());
         m.put("mname", r.merchantName());
         m.put("at", r.purchasedAt());

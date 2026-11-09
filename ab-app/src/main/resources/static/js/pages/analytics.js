@@ -2,6 +2,8 @@ import { h, clear, append, debounce } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { pageHeader, sectionTitle, emptyState, skeleton, errorBlock } from '../ui/layout.js';
 import { segmented } from '../ui/segmented.js';
+import { scopeSwitch } from '../ui/scope.js';
+import { getScope } from '../scope.js';
 import { makeField, selectEl, switchEl } from '../ui/form.js';
 import { openPicker, pickerButton } from '../ui/picker.js';
 import { lineChart } from '../charts/lineChart.js';
@@ -37,6 +39,7 @@ const defaults = () => ({
 
 let state = defaults();
 let facetsCache = null;
+let facetsScope = null;
 
 const cur = () => state.currency || getCurrency();
 const opts = (pairs) => pairs.map(([value, key]) => ({ value, label: t(key) }));
@@ -65,9 +68,10 @@ function applyQuery(q) {
 export async function render(ctx) {
   if (!ctx.reused) applyQuery(ctx.query);
   let facets = facetsCache;
-  if (!ctx.reused || !facets) {
+  if (!ctx.reused || !facets || facetsScope !== getScope()) {
     try { facets = await api.facets(); } catch { facets = EMPTY_FACETS; }
     facetsCache = facets;
+    facetsScope = getScope();
   }
   facets = { ...EMPTY_FACETS, ...facets };
 
@@ -320,6 +324,7 @@ export async function render(ctx) {
   return h('div', { class: 'page' },
     pageHeader({ title: t('analytics.title') }),
     h('div', { class: 'page-body' },
+      scopeSwitch(),
       segmented(opts(TABS), state.tab, (v) => { state.tab = v; mountPanel(); }),
       panelHost));
 }

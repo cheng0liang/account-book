@@ -38,6 +38,14 @@ public class ApiException extends RuntimeException {
         return new ApiException(HttpStatus.CONFLICT, "CONFLICT", messageKey, args, List.of());
     }
 
+    public static ApiException unauthorized(String messageKey, Object... args) {
+        return new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", messageKey, args, List.of());
+    }
+
+    public static ApiException forbidden(String messageKey, Object... args) {
+        return new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", messageKey, args, List.of());
+    }
+
     public static ApiException of(HttpStatus status, String code, String messageKey, Object... args) {
         return new ApiException(status, code, messageKey, args, List.of());
     }

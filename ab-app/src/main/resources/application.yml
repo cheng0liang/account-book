@@ -59,6 +59,21 @@ ab:
       base-url: ${AB_OCR_BASE_URL:https://api.openai.com/v1}
       api-key: ${AB_OCR_API_KEY:}
       model: ${AB_OCR_MODEL:gpt-4o-mini}
+  auth:
+    # dev-mode: SMS codes are returned in the API response (no gateway) and providers without credentials use a
+    # local mock sign-in. MUST be false (AB_AUTH_DEV=false) in any deployment reachable by others.
+    dev-mode: ${AB_AUTH_DEV:true}
+    require-location: ${AB_AUTH_REQUIRE_LOCATION:true}
+    session-days: 30
+    public-base-url: ${AB_PUBLIC_BASE_URL:} # externally visible origin, used for OAuth redirect URIs
+    sms:
+      code-ttl-seconds: 300
+      resend-seconds: 60
+      max-attempts: 5
+    # oauth: set <provider>.client-id/client-secret (apple also team-id, key-id, private-key); providers without
+    # credentials are hidden unless dev-mode is on.
+    # oauth:
+    #   google: { client-id: ${AB_OAUTH_GOOGLE_ID:}, client-secret: ${AB_OAUTH_GOOGLE_SECRET:} }
 
 logging:
   level:

@@ -41,12 +41,32 @@ class ReceiptFlowTest {
         r.add("ab.data-dir", () -> dataDir.toString());
         r.add("ab.ocr.provider", () -> "mock");
         r.add("spring.cloud.nacos.config.server-addr", () -> "127.0.0.1:1");
+        r.add("ab.auth.dev-mode", () -> "true");
     }
 
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
 
+    private String token;
+
+    private static final String LOCATION = "{\"latitude\":35.68,\"longitude\":139.76,\"accuracy\":20}";
+
+    /** Signs in through the real SMS flow (dev-mode returns the code) and keeps the session token for later calls. */
+    private String login(String phone) throws Exception {
+        var sent = json.readTree(mvc.perform(post("/api/auth/sms/send").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"phone\":\"" + phone + "\"}")).andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString());
+        String code = sent.get("debugCode").asText();
+        var body = "{\"phone\":\"" + phone + "\",\"code\":\"" + code + "\",\"location\":" + LOCATION + "}";
+        var res = json.readTree(mvc.perform(post("/api/auth/sms/login").contentType(MediaType.APPLICATION_JSON)
+                .content(body)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        return res.get("token").asText();
+    }
+
     private JsonNode call(org.springframework.test.web.servlet.RequestBuilder rb, int expected) throws Exception {
+        if (token != null && rb instanceof org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder b) {
+            b.header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+        }
         var res = mvc.perform(rb).andExpect(status().is(expected)).andReturn().getResponse();
         String body = res.getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         return body.isBlank() ? null : json.readTree(body);
@@ -66,6 +86,11 @@ class ReceiptFlowTest {
 
     @Test
     void scanSaveCompareAndDelete() throws Exception {
+        // anything but the public endpoints needs a session
+        call(get("/api/receipts"), 401);
+        call(get("/api/analytics/facets"), 401);
+        token = login("+819012345678");
+
         var meta = call(get("/api/meta"), 200);
         assertThat(meta.get("ocrProvider").asText()).isEqualTo("mock");
         assertThat(meta.get("merchantTypes").toString()).contains("SUPERMARKET");
@@ -97,14 +122,14 @@ class ReceiptFlowTest {
 
         // price comparison across merchants, served with an ETag that yields 304 until the data changes
         String url = "/api/analytics/price-compare?dimension=merchant&productId=" + productId;
-        var first = mvc.perform(get(url)).andExpect(status().isOk()).andReturn().getResponse();
+        var first = mvc.perform(get(url).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)).andExpect(status().isOk()).andReturn().getResponse();
         String etag = first.getHeader(HttpHeaders.ETAG);
         assertThat(etag).isNotBlank();
         var chart = json.readTree(first.getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
         assertThat(chart.get("labels").size()).isEqualTo(2);
         assertThat(chart.get("labels").get(0).asText()).isEqualTo("OK Store");
         assertThat(chart.get("series").get(0).get("data").get(0).decimalValue()).isEqualByComparingTo("168");
-        mvc.perform(get(url).header(HttpHeaders.IF_NONE_MATCH, etag)).andExpect(status().isNotModified());
+        mvc.perform(get(url).header(HttpHeaders.IF_NONE_MATCH, etag).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)).andExpect(status().isNotModified());
 
         var trend = call(get("/api/analytics/price-trend?granularity=month&productId=" + productId), 200);
         assertThat(trend.get("labels").toString()).contains("2026-10", "2026-11");
@@ -124,7 +149,7 @@ class ReceiptFlowTest {
         var edited = receipt("OK Store", "东京", "2026-11-02T18:30", "150");
         call(put("/api/receipts/" + b.get("id").asLong()).contentType(MediaType.APPLICATION_JSON)
                 .content(edited.toString()), 200);
-        var second = mvc.perform(get(url).header(HttpHeaders.IF_NONE_MATCH, etag)).andExpect(status().isOk()).andReturn()
+        var second = mvc.perform(get(url).header(HttpHeaders.IF_NONE_MATCH, etag).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)).andExpect(status().isOk()).andReturn()
                 .getResponse();
         assertThat(json.readTree(second.getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).get("series").get(0).get("data").get(0).decimalValue())
                 .isEqualByComparingTo("150");
@@ -134,6 +159,53 @@ class ReceiptFlowTest {
         var after = call(get(url), 200);
         assertThat(after.get("labels").size()).isEqualTo(1);
         call(get("/api/receipts/" + a.get("id").asLong()), 404);
+    }
+
+    @Test
+    void familyMembersShareSpendingButOnlyOwnersEdit() throws Exception {
+        String alice = login("+819011110001");
+        String bob = login("+819011110002");
+        String carol = login("+819011110003");
+
+        token = alice;
+        var created = call(post("/api/family").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Home\"}"), 201);
+        String code = created.get("inviteCode").asText();
+        var mine = call(post("/api/receipts").contentType(MediaType.APPLICATION_JSON)
+                .content(receipt("Aeon", "Tokyo", "2026-10-05T09:00", "100").toString()), 201);
+        long id = mine.get("id").asLong();
+
+        token = bob;
+        call(get("/api/receipts/" + id), 404);
+        call(post("/api/family/join").contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"" + code + "\"}"), 200);
+        var bobs = call(post("/api/receipts").contentType(MediaType.APPLICATION_JSON)
+                .content(receipt("Aeon", "Tokyo", "2026-10-06T09:00", "120").toString()), 201);
+
+        // family scope covers both members, me scope only the caller
+        assertThat(call(get("/api/receipts?scope=family"), 200).get("total").asInt()).isEqualTo(2);
+        assertThat(call(get("/api/receipts?scope=me"), 200).get("total").asInt()).isEqualTo(1);
+        assertThat(call(get("/api/analytics/spending?groupBy=month&scope=family"), 200).get("total").decimalValue())
+                .isEqualByComparingTo("220");
+        assertThat(call(get("/api/analytics/spending?groupBy=month"), 200).get("total").decimalValue())
+                .isEqualByComparingTo("120");
+
+        // visible to a family member, but only its owner may change it
+        assertThat(call(get("/api/receipts/" + id), 200).get("owner").get("mine").asBoolean()).isFalse();
+        call(put("/api/receipts/" + id).contentType(MediaType.APPLICATION_JSON)
+                .content(receipt("Aeon", "Tokyo", "2026-10-05T09:00", "1").toString()), 403);
+        call(delete("/api/receipts/" + id), 403);
+
+        // an outsider sees nothing of it, even asking for the family scope
+        token = carol;
+        call(get("/api/receipts/" + id), 404);
+        assertThat(call(get("/api/receipts?scope=family"), 200).get("total").asInt()).isZero();
+
+        // leaving ends the sharing in both directions
+        token = bob;
+        call(post("/api/family/leave"), 204);
+        call(get("/api/receipts/" + id), 404);
+        token = alice;
+        call(get("/api/receipts/" + bobs.get("id").asLong()), 404);
+        assertThat(call(get("/api/receipts?scope=family"), 200).get("total").asInt()).isEqualTo(1);
     }
 
     /** Tiny helper so the multipart call above reads in one line. */

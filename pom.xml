@@ -22,6 +22,8 @@
         <module>ab-merchant</module>
         <module>ab-product</module>
         <module>ab-ocr</module>
+        <module>ab-user</module>
+        <module>ab-family</module>
         <module>ab-receipt</module>
         <module>ab-analytics</module>
         <module>ab-app</module>
@@ -81,6 +83,16 @@
             <dependency>
                 <groupId>com.accountbook</groupId>
                 <artifactId>ab-ocr</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.accountbook</groupId>
+                <artifactId>ab-user</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.accountbook</groupId>
+                <artifactId>ab-family</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

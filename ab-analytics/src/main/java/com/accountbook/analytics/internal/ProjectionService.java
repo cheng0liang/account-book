@@ -9,6 +9,7 @@ import com.accountbook.receipt.api.ReceiptFact;
 import com.accountbook.receipt.api.ReceiptItemFact;
 import com.accountbook.receipt.api.event.ReceiptDeletedEvent;
 import com.accountbook.receipt.api.event.ReceiptSavedEvent;
+import com.accountbook.user.api.event.UserRegisteredEvent;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -29,7 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class ProjectionService {
 
     /** Bump when projection logic changes; a mismatch triggers a full rebuild at startup. */
-    static final long REVISION = 1;
+    static final long REVISION = 2;
 
     private static final Logger log = LoggerFactory.getLogger(ProjectionService.class);
 
@@ -57,7 +58,7 @@ class ProjectionService {
         syncDimensions(Set.of(f.merchantId()), f.items().stream().map(ReceiptItemFact::productId).toList());
         repo.insertFacts(f);
         for (ReceiptItemFact it : f.items()) {
-            buckets.add(new ProjectionRepository.Bucket(f.purchasedDate(), f.currency(), f.merchantId(), it.productId()));
+            buckets.add(new ProjectionRepository.Bucket(f.userId(), f.purchasedDate(), f.currency(), f.merchantId(), it.productId()));
         }
         repo.rebuildBuckets(buckets);
         repo.bumpVersion();
@@ -84,6 +85,15 @@ class ProjectionService {
     public void on(ProductChangedEvent e) {
         repo.upsertProduct(e.product());
         repo.bumpVersion();
+    }
+
+    @EventListener
+    @Transactional
+    public void on(UserRegisteredEvent e) {
+        if (e.first()) {
+            repo.claimLegacy(e.userId());
+            repo.bumpVersion();
+        }
     }
 
     @EventListener(ApplicationReadyEvent.class)

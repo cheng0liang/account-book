@@ -86,7 +86,7 @@ class RecognitionService {
         String payment = r.paymentMethod() != null && PaymentMethod.isValid(r.paymentMethod()) ? r.paymentMethod() : null;
 
         var draft = new ReceiptForm(null, toMerchant(r, exactMerchant), at.format(ReceiptResolver.STORED), currency,
-                r.totalAmount(), r.taxAmount(), r.discountAmount(), payment, null, "OCR", token, null, items);
+                r.totalAmount(), r.taxAmount(), r.discountAmount(), payment, null, "OCR", token, null, items, null);
         return new RecognizeResponse(token, r.provider(), List.copyOf(warnings), draft, merchantMatches, candidates);
     }
 

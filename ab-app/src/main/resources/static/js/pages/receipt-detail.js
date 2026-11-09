@@ -13,6 +13,10 @@ const kv = (k, v) => (v == null || v === '' ? null : h('div', { class: 'kv' }, h
 export async function render(ctx) {
   const id = ctx.params.id;
   const r = await api.getReceipt(id);
+  if (r.imageUrl) {
+    r.imageUrl = await api.fetchBlobUrl(r.imageUrl).catch(() => null);
+    if (r.imageUrl) ctx.onCleanup(() => URL.revokeObjectURL(r.imageUrl));
+  }
   const m = r.merchant || {};
   const cur = r.currency;
   const hasGeo = m.latitude != null && m.longitude != null;
@@ -46,7 +50,7 @@ export async function render(ctx) {
   return h('div', { class: 'page' },
     pageHeader({
       title: t('detail.title'), back: '#/home',
-      right: [
+      right: r.owner && !r.owner.mine ? null : [
         h('a', { class: 'icon-btn', href: `#/receipt/${id}/edit`, 'aria-label': t('common.edit') }, icon('edit')),
         h('button', { class: 'icon-btn danger', type: 'button', 'aria-label': t('common.delete'), onClick: remove }, icon('trash')),
       ],
@@ -62,6 +66,7 @@ export async function render(ctx) {
         kv(t('merchant.address'), m.address),
         hasGeo ? h('a', { class: 'map-link', href: mapUrl(m.latitude, m.longitude), target: '_blank', rel: 'noopener' }, icon('pin', 16), t('detail.openMap')) : null,
         h('hr'),
+        r.owner && !r.owner.mine ? kv(t('family.recordedBy'), r.owner.nickname || t('family.unknownMember')) : null,
         kv(t('form.purchasedAt'), fmtDateTime(r.purchasedAt)),
         kv(t('form.payment'), r.paymentMethod ? tOr(`payment.${r.paymentMethod}`, r.paymentMethod) : null),
         kv(t('form.note'), r.note)),

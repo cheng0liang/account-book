@@ -4,21 +4,27 @@ import com.accountbook.common.web.ApiException;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-/** Parsed, validated request filter. Its toString is the cache key, so only known parameters ever reach it. */
+/**
+ * Parsed, validated request filter. Its toString is the cache key, so only known parameters ever reach it.
+ * {@code userIds} is the data scope (the caller, or their family) and is part of the key, so scopes never share a cache
+ * entry or ETag.
+ */
 record Filter(String from, String to, String currency, String country, String city, String district,
-              String merchantType, Long merchantId, Long productId, String brand, String category, String tag) {
+              String merchantType, Long merchantId, Long productId, String brand, String category, String tag,
+              List<Long> userIds) {
 
     static final Set<String> GRANULARITY = Set.of("day", "week", "month");
     static final Set<String> METRIC = Set.of("avg", "min", "max");
     static final Set<String> COMPARE = Set.of("merchant", "city", "district", "country", "merchantType", "brand", "product");
     static final Set<String> SPENDING = Set.of("day", "month", "merchant", "merchantType", "category", "brand", "city", "district");
 
-    static Filter parse(Map<String, String> p, String defaultCurrency) {
+    static Filter parse(Map<String, String> p, String defaultCurrency, Collection<Long> userIds) {
         String currency = text(p, "currency");
         if (currency == null) {
             currency = defaultCurrency;
@@ -27,11 +33,11 @@ record Filter(String from, String to, String currency, String country, String ci
         return new Filter(date(p, "from"), date(p, "to"), currency.toUpperCase(Locale.ROOT),
                 country == null ? null : country.toUpperCase(Locale.ROOT), text(p, "city"), text(p, "district"),
                 text(p, "merchantType"), number(p, "merchantId"), number(p, "productId"), text(p, "brand"),
-                text(p, "category"), text(p, "tag"));
+                text(p, "category"), text(p, "tag"), userIds.stream().distinct().sorted().toList());
     }
 
     Filter withProduct(long id) {
-        return new Filter(from, to, currency, country, city, district, merchantType, merchantId, id, brand, category, tag);
+        return new Filter(from, to, currency, country, city, district, merchantType, merchantId, id, brand, category, tag, userIds);
     }
 
     boolean hasProductScope() {

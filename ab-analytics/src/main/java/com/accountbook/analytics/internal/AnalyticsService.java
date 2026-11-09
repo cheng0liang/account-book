@@ -8,6 +8,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -194,8 +195,8 @@ class AnalyticsService {
         return body;
     }
 
-    Map<String, Object> facets(long version) {
-        Map<String, Object> body = queries.facets();
+    Map<String, Object> facets(Collection<Long> userIds, long version) {
+        Map<String, Object> body = queries.facets(userIds);
         body.put("version", version);
         return body;
     }

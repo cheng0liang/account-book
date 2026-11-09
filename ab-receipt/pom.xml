@@ -30,6 +30,14 @@
         </dependency>
         <dependency>
             <groupId>com.accountbook</groupId>
+            <artifactId>ab-user</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.accountbook</groupId>
+            <artifactId>ab-family</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.accountbook</groupId>
             <artifactId>ab-common</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>

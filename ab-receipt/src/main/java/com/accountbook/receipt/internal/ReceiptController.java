@@ -2,6 +2,8 @@ package com.accountbook.receipt.internal;
 
 import com.accountbook.common.web.ApiException;
 import com.accountbook.common.web.PageResult;
+import com.accountbook.family.api.Scope;
+import com.accountbook.user.api.CurrentUser;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -50,36 +52,37 @@ class ReceiptController {
                                     @RequestParam(required = false) String to,
                                     @RequestParam(required = false) Long merchantId,
                                     @RequestParam(required = false) String q,
+                                    @RequestParam(required = false) String scope,
                                     @RequestParam(defaultValue = "0") int page,
                                     @RequestParam(defaultValue = "20") int size) {
-        return service.list(from, to, merchantId, q, page, size);
+        return service.list(CurrentUser.id(), Scope.parse(scope), from, to, merchantId, q, page, size);
     }
 
     @GetMapping("/{id}")
     ReceiptForm get(@PathVariable long id) {
-        return service.get(id);
+        return service.get(CurrentUser.id(), id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     ReceiptForm create(@Valid @RequestBody ReceiptForm body) {
-        return service.create(body);
+        return service.create(CurrentUser.id(), body);
     }
 
     @PutMapping("/{id}")
     ReceiptForm update(@PathVariable long id, @Valid @RequestBody ReceiptForm body) {
-        return service.update(id, body);
+        return service.update(CurrentUser.id(), id, body);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void delete(@PathVariable long id) {
-        service.delete(id);
+        service.delete(CurrentUser.id(), id);
     }
 
     @GetMapping("/{id}/image")
     ResponseEntity<Resource> image(@PathVariable long id) {
-        var path = service.imageOf(id).orElseThrow(() -> ApiException.notFound("receipt.image.notFound", id));
+        var path = service.imageOf(CurrentUser.id(), id).orElseThrow(() -> ApiException.notFound("receipt.image.notFound", id));
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.maxAge(1, TimeUnit.DAYS).cachePrivate())
                 .contentType(MediaType.parseMediaType(ImageStore.mimeOf(path.getFileName().toString())))

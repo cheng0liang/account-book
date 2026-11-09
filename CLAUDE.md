@@ -18,9 +18,9 @@ java -jar ab-app/target/account-book.jar         # :8080
 
 ## 模块规则
 
-- DAG：common ← merchant/product/ocr ← receipt ← analytics，ab-app 装配。
+- DAG：common ← merchant/product/ocr/user ← family ← receipt ← analytics，ab-app 装配。
 - 跨模块只依赖对方的 `.api` 包；`.internal` 不可见。`ModuleBoundaryTest`（ArchUnit）强制，改动后必须保持通过。
-- 表前缀 `mer_/prd_/rcp_/ana_`，禁止跨模块外键与 JOIN；跨模块数据靠 API 或同步 Spring 事件（在写入方事务内）。
+- 表前缀 `mer_/prd_/rcp_/ana_/usr_/fam_`，禁止跨模块外键与 JOIN；跨模块数据靠 API 或同步 Spring 事件（在写入方事务内）。
 - 迁移脚本在 `classpath:db/migration/<module>`，由 `ModuleMigrator` 按模块执行，历史表 `flyway_<module>`；`spring.flyway.enabled=false`。
 - 新增业务模块要在 `ModuleBoundaryTest` 和 `specs/.../plan.md` 的模块表里登记。
 
@@ -33,6 +33,14 @@ java -jar ab-app/target/account-book.jar         # :8080
 - 名称匹配统一走 `NameNormalizer`。
 - 分析投影处理器必须幂等；改投影逻辑要把 `ProjectionService.REVISION` +1，启动时会自动重建。
 - 图表接口 ETag 为 `"v{version}-{hash}"`，任何写投影的路径都要 `bumpVersion()`。
+
+## 登录 / 家庭
+
+- `/api/**` 除 `/api/auth/**`、`/api/meta` 外均需 Bearer 会话；用 `CurrentUser.id()`，不信任请求里的 userId。
+- 小票/分析行带 `user_id`（0=遗留，首个注册用户认领）；读取用 `Scope.parse(p).userIds(familyApi, uid)`，分析缓存键/ETag 含 uid 列表；改用户相关投影逻辑要 bump `ProjectionService.REVISION`。
+- 改小票仅限本人（403 `receipt.ownerOnly`），同家庭可读，其他人 404。
+- `ab.auth.dev-mode` 开启时验证码回显 + 第三方 mock；生产必须关。第三方真实流程与短信网关无法在本地验证。
+- 前端：`auth.js` 存会话，`scope.js` 存家庭与范围；`<img>` 带不了 Authorization，图片走 `api.fetchBlobUrl`。
 
 ## 前端
 

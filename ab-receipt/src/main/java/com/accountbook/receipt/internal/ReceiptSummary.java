@@ -13,5 +13,6 @@ record ReceiptSummary(
         int itemCount,
         String paymentMethod,
         boolean hasImage,
-        List<String> firstItems) {
+        List<String> firstItems,
+        OwnerRef owner) {
 }

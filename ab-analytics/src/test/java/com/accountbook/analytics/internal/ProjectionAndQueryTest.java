@@ -12,6 +12,7 @@ import com.accountbook.product.api.ProductApi;
 import com.accountbook.product.api.ProductView;
 import com.accountbook.receipt.api.ReceiptApi;
 import com.accountbook.receipt.api.ReceiptFact;
+import com.accountbook.user.api.event.UserRegisteredEvent;
 import com.accountbook.receipt.api.ReceiptItemFact;
 import com.accountbook.receipt.api.event.ReceiptDeletedEvent;
 import com.accountbook.receipt.api.event.ReceiptSavedEvent;
@@ -33,6 +34,8 @@ class ProjectionAndQueryTest {
 
     private static final long SEIYU = 1;
     private static final long OK = 2;
+    private static final long ME = 1;
+    private static final long PARTNER = 2;
     private static final long MILK_1L = 10;
     private static final long MILK_500 = 11;
     private static final long BREAD = 12;
@@ -92,7 +95,11 @@ class ProjectionAndQueryTest {
     }
 
     private static ReceiptFact receipt(long id, long merchantId, String date, ReceiptItemFact... items) {
-        return new ReceiptFact(id, merchantId, date + "T12:00", date, "JPY", 0, 0, List.of(items));
+        return receiptOf(ME, id, merchantId, date, items);
+    }
+
+    private static ReceiptFact receiptOf(long userId, long id, long merchantId, String date, ReceiptItemFact... items) {
+        return new ReceiptFact(id, userId, merchantId, date + "T12:00", date, "JPY", 0, 0, List.of(items));
     }
 
     private static ReceiptItemFact line(long productId, double qty, long unit, long amount) {
@@ -111,7 +118,7 @@ class ProjectionAndQueryTest {
     }
 
     private ChartResponse compareMerchants(String productId, boolean normalized) {
-        var f = Filter.parse(Map.of("productId", productId), "JPY");
+        var f = Filter.parse(Map.of("productId", productId), "JPY", List.of(ME));
         return service.priceCompare(f, "merchant", normalized, repo.version());
     }
 
@@ -180,7 +187,7 @@ class ProjectionAndQueryTest {
         save(receipt(1, SEIYU, "2026-11-01", line(MILK_1L, 1, 200, 200), line(BREAD, 1, 150, 150)));
         save(receipt(2, OK, "2026-11-01", line(MILK_500, 1, 110, 110)));
 
-        var f = Filter.parse(Map.of("brand", "明治"), "JPY");
+        var f = Filter.parse(Map.of("brand", "明治"), "JPY", List.of(ME));
         var chart = service.priceCompare(f, "merchant", true, repo.version());
         assertThat(chart.unit()).isEqualTo("100ml");
         assertThat(chart.labels()).containsExactly("西友", "OK");
@@ -188,7 +195,7 @@ class ProjectionAndQueryTest {
         assertThat(chart.series().get(0).data().get(1)).isEqualByComparingTo(new BigDecimal("22.00"));
 
         // bread has no spec, so a normalized view of it has nothing to compare
-        var breadOnly = Filter.parse(Map.of("productId", "" + BREAD), "JPY");
+        var breadOnly = Filter.parse(Map.of("productId", "" + BREAD), "JPY", List.of(ME));
         assertThat(service.priceCompare(breadOnly, "merchant", true, repo.version()).labels()).isEmpty();
     }
 
@@ -205,7 +212,7 @@ class ProjectionAndQueryTest {
         save(receipt(1, SEIYU, "2026-10-05", line(MILK_1L, 1, 200, 200)));
         save(receipt(2, OK, "2026-11-05", line(MILK_1L, 1, 180, 180)));
 
-        var f = Filter.parse(Map.of("productId", "" + MILK_1L), "JPY");
+        var f = Filter.parse(Map.of("productId", "" + MILK_1L), "JPY", List.of(ME));
         var chart = service.priceTrend(f, List.of(), "month", "avg", false, repo.version());
         assertThat(chart.labels()).containsExactly("2026-10", "2026-11");
         assertThat(chart.series()).hasSize(2);
@@ -219,7 +226,7 @@ class ProjectionAndQueryTest {
         save(receipt(1, SEIYU, "2026-11-01", line(MILK_1L, 1, 200, 200), line(BREAD, 1, 150, 150)));
         save(receipt(2, OK, "2026-11-02", line(BREAD, 2, 100, 200)));
 
-        var chart = service.spending(Filter.parse(Map.of(), "JPY"), "merchant", 10, repo.version());
+        var chart = service.spending(Filter.parse(Map.of(), "JPY", List.of(ME)), "merchant", 10, repo.version());
         assertThat(chart.labels()).containsExactly("西友", "OK");
         assertThat(chart.total()).isEqualByComparingTo("550");
         assertThat(chart.count()).isEqualTo(2);
@@ -308,11 +315,60 @@ class ProjectionAndQueryTest {
     void facetsListOnlyValuesThatHaveData() {
         save(receipt(1, SEIYU, "2026-11-01", line(MILK_1L, 1, 200, 200)));
 
-        var facets = service.facets(repo.version());
+        var facets = service.facets(List.of(ME), repo.version());
         assertThat(facets.get("currencies")).isEqualTo(List.of("JPY"));
         assertThat(facets.get("brands")).isEqualTo(List.of("明治"));
         assertThat(facets.get("tags")).isEqualTo(List.of("牛奶"));
         assertThat(facets.get("countries")).isEqualTo(List.of("JP"));
         assertThat(((Map<?, ?>) facets.get("dateRange")).get("min")).isEqualTo("2026-11-01");
+    }
+
+    @Test
+    void chartsAndFacetsAreScopedToTheUsersInTheRequestedScope() {
+        save(receiptOf(ME, 1, SEIYU, "2026-11-01", line(MILK_1L, 1, 200, 200)));
+        save(receiptOf(PARTNER, 2, OK, "2026-11-02", line(MILK_1L, 1, 180, 180), line(BREAD, 1, 150, 150)));
+        var product = Map.of("productId", "" + MILK_1L);
+
+        var mine = service.priceCompare(Filter.parse(product, "JPY", List.of(ME)), "merchant", false, repo.version());
+        assertThat(mine.labels()).containsExactly("西友");
+
+        var family = service.priceCompare(Filter.parse(product, "JPY", List.of(ME, PARTNER)), "merchant", false,
+                repo.version());
+        assertThat(family.labels()).containsExactlyInAnyOrder("西友", "OK");
+
+        var stranger = service.priceCompare(Filter.parse(product, "JPY", List.of(99L)), "merchant", false,
+                repo.version());
+        assertThat(stranger.labels()).isEmpty();
+
+        assertThat(service.facets(List.of(ME), repo.version()).get("brands")).isEqualTo(List.of("明治"));
+        assertThat(service.facets(List.of(ME, PARTNER), repo.version()).get("brands"))
+                .asList().containsExactlyInAnyOrder("明治", "山崎");
+        assertThat(service.facets(List.of(99L), repo.version()).get("currencies")).isEqualTo(List.<String>of());
+    }
+
+    @Test
+    void sameDayBucketsOfDifferentUsersStaySeparateAndResaveOnlyTouchesTheOwner() {
+        save(receiptOf(ME, 1, SEIYU, "2026-11-01", line(MILK_1L, 1, 200, 200)));
+        save(receiptOf(PARTNER, 2, SEIYU, "2026-11-01", line(MILK_1L, 1, 100, 100)));
+        assertThat(count("SELECT COUNT(*) FROM ana_price_daily")).isEqualTo(2);
+
+        delete(2);
+
+        assertThat(count("SELECT COUNT(*) FROM ana_price_daily")).isEqualTo(1);
+        assertThat(count("SELECT amount_minor FROM ana_price_daily WHERE user_id = " + ME)).isEqualTo(200);
+    }
+
+    @Test
+    void firstRegisteredUserClaimsLegacyRowsAndLaterUsersDoNot() {
+        save(receiptOf(0, 1, SEIYU, "2026-11-01", line(MILK_1L, 1, 200, 200)));
+        long before = repo.version();
+
+        projection.on(new UserRegisteredEvent(7, false));
+        assertThat(count("SELECT COUNT(*) FROM ana_price_daily WHERE user_id = 0")).isEqualTo(1);
+
+        projection.on(new UserRegisteredEvent(ME, true));
+        assertThat(count("SELECT COUNT(*) FROM ana_price_daily WHERE user_id = 0")).isZero();
+        assertThat(count("SELECT COUNT(*) FROM ana_price_fact WHERE user_id = " + ME)).isEqualTo(1);
+        assertThat(repo.version()).isGreaterThan(before);
     }
 }

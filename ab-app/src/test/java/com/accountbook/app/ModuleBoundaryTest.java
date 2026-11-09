@@ -28,18 +28,23 @@ class ModuleBoundaryTest {
     static final ArchRule receiptInternal = internalIsPrivate("receipt");
     @ArchTest
     static final ArchRule analyticsInternal = internalIsPrivate("analytics");
+    @ArchTest
+    static final ArchRule userInternal = internalIsPrivate("user");
+    @ArchTest
+    static final ArchRule familyInternal = internalIsPrivate("family");
 
     @ArchTest
     static final ArchRule commonDependsOnNoModule = noClasses().that().resideInAPackage("com.accountbook.common..")
             .should().dependOnClassesThat().resideInAnyPackage("com.accountbook.merchant..",
                     "com.accountbook.product..", "com.accountbook.ocr..", "com.accountbook.receipt..",
-                    "com.accountbook.analytics..");
+                    "com.accountbook.analytics..", "com.accountbook.user..", "com.accountbook.family..");
 
     @ArchTest
     static final ArchRule leafModulesAreIndependent = noClasses()
             .that().resideInAnyPackage("com.accountbook.merchant..", "com.accountbook.product..", "com.accountbook.ocr..")
-            .should().dependOnClassesThat().resideInAnyPackage("com.accountbook.receipt..", "com.accountbook.analytics..")
-            .as("merchant/product/ocr must not depend on receipt or analytics");
+            .should().dependOnClassesThat().resideInAnyPackage("com.accountbook.receipt..", "com.accountbook.analytics..",
+                    "com.accountbook.user..", "com.accountbook.family..")
+            .as("merchant/product/ocr are global catalogues: no dependency on receipt, analytics, user or family");
 
     @ArchTest
     static final ArchRule merchantProductOcrDoNotKnowEachOther = noClasses()
@@ -55,6 +60,19 @@ class ModuleBoundaryTest {
     static final ArchRule ocrDoesNotKnowOthers = noClasses()
             .that().resideInAPackage("com.accountbook.ocr..")
             .should().dependOnClassesThat().resideInAnyPackage("com.accountbook.merchant..", "com.accountbook.product..");
+
+    @ArchTest
+    static final ArchRule userDependsOnlyOnCommon = noClasses()
+            .that().resideInAPackage("com.accountbook.user..")
+            .should().dependOnClassesThat().resideInAnyPackage("com.accountbook.merchant..", "com.accountbook.product..",
+                    "com.accountbook.ocr..", "com.accountbook.family..", "com.accountbook.receipt..",
+                    "com.accountbook.analytics..");
+
+    @ArchTest
+    static final ArchRule familyOnlyKnowsUser = noClasses()
+            .that().resideInAPackage("com.accountbook.family..")
+            .should().dependOnClassesThat().resideInAnyPackage("com.accountbook.merchant..", "com.accountbook.product..",
+                    "com.accountbook.ocr..", "com.accountbook.receipt..", "com.accountbook.analytics..");
 
     @ArchTest
     static final ArchRule receiptDoesNotKnowAnalytics = noClasses()

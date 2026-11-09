@@ -2,6 +2,10 @@ package com.accountbook.analytics.internal;
 
 import com.accountbook.common.config.AppProperties;
 import com.accountbook.common.web.ApiException;
+import com.accountbook.family.api.FamilyApi;
+import com.accountbook.family.api.Scope;
+import com.accountbook.user.api.CurrentUser;
+import java.util.List;
 import java.util.Map;
 import java.util.function.LongFunction;
 import org.springframework.http.CacheControl;
@@ -24,22 +28,32 @@ class AnalyticsController {
     private final AnalyticsService service;
     private final ProjectionService projection;
     private final AppProperties props;
+    private final FamilyApi families;
 
-    AnalyticsController(AnalyticsService service, ProjectionService projection, AppProperties props) {
+    AnalyticsController(AnalyticsService service, ProjectionService projection, AppProperties props,
+                        FamilyApi families) {
         this.service = service;
         this.projection = projection;
         this.props = props;
+        this.families = families;
+    }
+
+    /** The users whose data this request may read: the caller, or the caller's whole family for scope=family. */
+    private List<Long> scopeOf(Map<String, String> p) {
+        return Scope.parse(p.get("scope")).userIds(families, CurrentUser.id());
     }
 
     @GetMapping("/facets")
-    ResponseEntity<byte[]> facets(@RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String inm) {
-        return respond(service.serve("facets", "", inm, service::facets));
+    ResponseEntity<byte[]> facets(@RequestParam Map<String, String> p,
+                                  @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String inm) {
+        List<Long> uids = scopeOf(p).stream().sorted().toList();
+        return respond(service.serve("facets", uids, inm, v -> service.facets(uids, v)));
     }
 
     @GetMapping("/price-trend")
     ResponseEntity<byte[]> priceTrend(@RequestParam Map<String, String> p,
                                       @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String inm) {
-        Filter f = Filter.parse(p, props.defaultCurrency());
+        Filter f = Filter.parse(p, props.defaultCurrency(), scopeOf(p));
         if (f.productId() == null) {
             throw ApiException.invalidField("productId", "validation.required");
         }
@@ -55,7 +69,7 @@ class AnalyticsController {
     @GetMapping("/price-compare")
     ResponseEntity<byte[]> priceCompare(@RequestParam Map<String, String> p,
                                         @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String inm) {
-        Filter f = Filter.parse(p, props.defaultCurrency());
+        Filter f = Filter.parse(p, props.defaultCurrency(), scopeOf(p));
         String dimension = Filter.choice(p, "dimension", Filter.COMPARE, "merchant");
         AnalyticsService.requireScope(dimension, f);
         boolean normalized = Boolean.parseBoolean(p.get("normalized"));
@@ -67,7 +81,7 @@ class AnalyticsController {
     @GetMapping("/spending")
     ResponseEntity<byte[]> spending(@RequestParam Map<String, String> p,
                                     @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String inm) {
-        Filter f = Filter.parse(p, props.defaultCurrency());
+        Filter f = Filter.parse(p, props.defaultCurrency(), scopeOf(p));
         String groupBy = Filter.choice(p, "groupBy", Filter.SPENDING, "month");
         Long n = Filter.number(p, "topN");
         int topN = n == null ? 10 : (int) Math.min(Math.max(n, 1), 50);
@@ -78,7 +92,7 @@ class AnalyticsController {
     @GetMapping("/price-table")
     ResponseEntity<byte[]> priceTable(@RequestParam Map<String, String> p,
                                       @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String inm) {
-        Filter f = Filter.parse(p, props.defaultCurrency());
+        Filter f = Filter.parse(p, props.defaultCurrency(), scopeOf(p));
         if (f.productId() == null) {
             throw ApiException.invalidField("productId", "validation.required");
         }

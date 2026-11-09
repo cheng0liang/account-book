@@ -2,6 +2,9 @@ import { h } from '../ui/dom.js';
 import { pageHeader } from '../ui/layout.js';
 import { selectEl } from '../ui/form.js';
 import { toast } from '../ui/toast.js';
+import { icon } from '../ui/icons.js';
+import { getUser } from '../auth.js';
+import { getFamily } from '../scope.js';
 import { t, LANGS, getLang, setLang } from '../i18n/index.js';
 import { getMeta, getCurrency, setCurrency } from '../store.js';
 
@@ -17,6 +20,14 @@ export function render() {
   return h('div', { class: 'page' },
     pageHeader({ title: t('settings.title') }),
     h('div', { class: 'page-body' },
+      h('section', { class: 'card list' },
+        h('h3', { class: 'list-title' }, t('settings.account')),
+        h('a', { class: 'link-row', href: '#/profile' },
+          h('span', null, t('settings.profile')),
+          h('span', { class: 'muted' }, getUser()?.nickname || ''), icon('chevronRight', 18)),
+        h('a', { class: 'link-row', href: '#/family' },
+          h('span', null, t('settings.family')),
+          h('span', { class: 'muted' }, getFamily()?.name || ''), icon('chevronRight', 18))),
       h('section', { class: 'card' }, h('h3', null, t('settings.language')), langs),
       h('section', { class: 'card' },
         h('h3', null, t('settings.currency')),

@@ -26,6 +26,14 @@
         </dependency>
         <dependency>
             <groupId>com.accountbook</groupId>
+            <artifactId>ab-user</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.accountbook</groupId>
+            <artifactId>ab-family</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.accountbook</groupId>
             <artifactId>ab-receipt</artifactId>
         </dependency>
         <dependency>

@@ -1,6 +1,7 @@
 package com.accountbook.analytics.internal;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +83,7 @@ class QueryRepository {
     private static Where where(Ctx c) {
         Filter f = c.filter();
         Where w = new Where();
+        w.add("d.user_id IN (:uids)", "uids", f.userIds());
         w.add("d.currency = :cur", "cur", f.currency());
         if (f.from() != null) {
             w.add("d.purchased_date >= :from", "from", f.from());
@@ -233,28 +235,32 @@ class QueryRepository {
                 .query((rs, i) -> new Latest(rs.getLong(1), rs.getString(2), rs.getDouble(3))).list();
     }
 
-    Map<String, Object> facets() {
-        String merchants = "(SELECT DISTINCT merchant_id FROM ana_price_daily)";
-        String prods = "(SELECT DISTINCT product_id FROM ana_price_daily)";
+    Map<String, Object> facets(Collection<Long> userIds) {
+        String merchants = "(SELECT DISTINCT merchant_id FROM ana_price_daily WHERE user_id IN (:uids))";
+        String prods = "(SELECT DISTINCT product_id FROM ana_price_daily WHERE user_id IN (:uids))";
         Map<String, Object> out = new java.util.LinkedHashMap<>();
-        out.put("currencies", strings("SELECT DISTINCT currency FROM ana_price_daily ORDER BY 1"));
+        out.put("currencies", strings("SELECT DISTINCT currency FROM ana_price_daily WHERE user_id IN (:uids) ORDER BY 1",
+                userIds));
         out.put("countries", strings("SELECT DISTINCT country FROM ana_merchant_dim WHERE country IS NOT NULL AND id IN "
-                + merchants + " ORDER BY 1"));
+                + merchants + " ORDER BY 1", userIds));
         out.put("cities", jdbc.sql("SELECT DISTINCT country, city FROM ana_merchant_dim WHERE city IS NOT NULL AND id IN "
                         + merchants + " ORDER BY 1, 2")
+                .param("uids", userIds)
                 .query((rs, i) -> Map.of("country", nz(rs.getString(1)), "city", rs.getString(2))).list());
         out.put("districts", jdbc.sql("SELECT DISTINCT country, city, district FROM ana_merchant_dim"
                         + " WHERE district IS NOT NULL AND id IN " + merchants + " ORDER BY 1, 2, 3")
+                .param("uids", userIds)
                 .query((rs, i) -> Map.of("country", nz(rs.getString(1)), "city", nz(rs.getString(2)),
                         "district", rs.getString(3))).list());
         out.put("merchantTypes", strings("SELECT DISTINCT type FROM ana_merchant_dim WHERE type IS NOT NULL AND id IN "
-                + merchants + " ORDER BY 1"));
+                + merchants + " ORDER BY 1", userIds));
         out.put("brands", strings("SELECT DISTINCT brand FROM ana_product_dim WHERE brand IS NOT NULL AND id IN "
-                + prods + " ORDER BY 1"));
+                + prods + " ORDER BY 1", userIds));
         out.put("categories", strings("SELECT DISTINCT category FROM ana_product_dim WHERE category IS NOT NULL AND id IN "
-                + prods + " ORDER BY 1"));
-        out.put("tags", strings("SELECT DISTINCT tag FROM ana_product_tag WHERE product_id IN " + prods + " ORDER BY 1"));
-        out.put("dateRange", jdbc.sql("SELECT MIN(purchased_date), MAX(purchased_date) FROM ana_price_daily")
+                + prods + " ORDER BY 1", userIds));
+        out.put("tags", strings("SELECT DISTINCT tag FROM ana_product_tag WHERE product_id IN " + prods + " ORDER BY 1", userIds));
+        out.put("dateRange", jdbc.sql("SELECT MIN(purchased_date), MAX(purchased_date) FROM ana_price_daily WHERE user_id IN (:uids)")
+                .param("uids", userIds)
                 .query((rs, i) -> {
                     Map<String, Object> r = new java.util.LinkedHashMap<>();
                     r.put("min", rs.getString(1));
@@ -264,8 +270,8 @@ class QueryRepository {
         return out;
     }
 
-    private List<String> strings(String sql) {
-        return jdbc.sql(sql).query(String.class).list();
+    private List<String> strings(String sql, Collection<Long> userIds) {
+        return jdbc.sql(sql).param("uids", userIds).query(String.class).list();
     }
 
     private static String nz(String s) {

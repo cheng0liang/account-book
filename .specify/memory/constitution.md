@@ -3,10 +3,10 @@
 ## Core Principles
 
 ### I. 模块自治，边界即契约（NON-NEGOTIABLE）
-- 后端采用 Maven 多模块，每个业务域一个模块：`ab-merchant`、`ab-product`、`ab-ocr`、`ab-receipt`、`ab-analytics`；`ab-common` 仅放与业务无关的共享内核；`ab-app` 只负责装配（启动类、配置、静态前端、全局测试），不含业务逻辑。
+- 后端采用 Maven 多模块，每个业务域一个模块：`ab-merchant`、`ab-product`、`ab-ocr`、`ab-user`、`ab-family`、`ab-receipt`、`ab-analytics`；`ab-common` 仅放与业务无关的共享内核；`ab-app` 只负责装配（启动类、配置、静态前端、全局测试），不含业务逻辑。
 - 每个业务模块的包结构固定为 `com.accountbook.<module>.api`（对外：接口、DTO、领域事件）与 `com.accountbook.<module>.internal`（对内：controller、service、repository、实现）。**其他模块只允许依赖 `api` 包**，由 ArchUnit 测试（`ab-app` 的 `ModuleBoundaryTest`）强制执行，违反即构建失败。
-- 模块依赖必须是有向无环图：`common ← merchant / product / ocr ← receipt ← analytics`。禁止反向与循环依赖。
-- 每个模块**独占**自己的表（表名前缀：`mer_` `prd_` `rcp_` `ana_`），禁止跨模块 JOIN、禁止跨模块外键；跨模块数据只能通过对方 `api` 接口或领域事件获取。
+- 模块依赖必须是有向无环图：`common ← merchant / product / ocr / user ← family ← receipt ← analytics`（`user` 只依赖 `common`；`family` 只依赖 `user`；`merchant/product/ocr` 是全局目录，不依赖 `user/family`）。禁止反向与循环依赖。
+- 每个模块**独占**自己的表（表名前缀：`mer_` `prd_` `rcp_` `ana_` `usr_` `fam_`），禁止跨模块 JOIN、禁止跨模块外键；跨模块数据只能通过对方 `api` 接口或领域事件获取。
 - 每个模块自带 Flyway 迁移脚本（`classpath:db/migration/<module>`）和独立的 history 表，以便日后整体搬走/拆成独立服务。
 
 ### II. 事件驱动的读写分离
@@ -48,6 +48,13 @@
 - 不引入 ORM（使用 Spring `JdbcClient` + 显式 SQL）、不引入与当前需求无关的框架。
 - OCR 通过 `OcrProvider` SPI 接入（`llm` / `mock` / `noop`），新增识别后端只需新增实现，不改 receipt 模块。
 
+### IX. 身份、会话与数据归属
+- 除 `/api/auth/**`、`/api/meta` 与静态资源外，所有 `/api/**` 必须携带会话令牌；由 `ab-user` 的 `AuthInterceptor` 统一拦截（401 `auth.required`），业务代码通过 `CurrentUser` 取当前用户，禁止信任请求中的 userId。
+- 会话为不透明令牌（`ab_` + 32 字节随机），库内只存 SHA-256；短信验证码同样只存哈希，并限制重发间隔与尝试次数。第三方登录（Apple/Google/微信/QQ/LINE）走服务端授权码流程，换取一次性 ticket 后再建立会话；凭据缺失的提供商仅在 `ab.auth.dev-mode=true` 时启用本地 mock，**生产环境必须关闭 dev-mode**。
+- 每次登录必须记录定位（经纬度、精度、定位时间）到 `usr_login_location`；`ab.auth.require-location` 默认开启。
+- 小票与分析数据带 `user_id`（0 = 登录功能上线前的遗留数据，由第一个注册用户认领）。读取按 `scope=me|family` 过滤：家庭范围 = 调用者所在家庭的全部成员；小票仅本人或同家庭成员可见（否则 404），修改/删除仅限本人（403）。商户与商品是全局目录，不按用户隔离。
+- 家庭规则：一人至多一个家庭；角色 `OWNER/MEMBER`；邀请码 8 位；成员上限 20；解散、移出、重置邀请码仅限创建者。分析缓存键与 ETag 必须包含用户集合。
+
 ## 开发流程（Spec-Driven）
 
 1. 新功能先走 `/speckit-specify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-implement`；文档位于 `specs/<NNN-feature>/`。
@@ -58,6 +65,6 @@
 
 本宪章高于其他开发约定。修改须：说明动机 → 更新版本号 → 同步更新受影响的 spec/plan 与 ArchUnit/i18n 校验。所有 PR/评审必须核对：模块边界、金额类型、图表查询是否走预聚合、i18n 三语言完整。
 
-**Version**: 1.1.1 | **Ratified**: 2026-11-06 | **Last Amended**: 2026-11-06
+**Version**: 1.2.0 | **Ratified**: 2026-11-06 | **Last Amended**: 2026-11-09
 （1.1.0：新增 SQLite 禁用只读事务、可空列读取规范、Nacos 缺席不影响健康检查。）
 （1.1.1：支持语言由四种改为三种，移除 zh-TW。）

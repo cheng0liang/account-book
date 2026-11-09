@@ -8,8 +8,9 @@ Java 17 · Spring Boot 3.3.5 · Spring Cloud 2023.0.3 / Alibaba 2023.0.1.3（Nac
 ## 2. 模块与依赖（DAG）
 ```
 ab-common ◄── ab-merchant ◄──┐
-          ◄── ab-product  ◄──┼── ab-receipt ◄── ab-analytics
-          ◄── ab-ocr     ◄───┘                       ▲
+          ◄── ab-product  ◄──┤
+          ◄── ab-ocr     ◄───┼── ab-receipt ◄── ab-analytics
+          ◄── ab-user ◄ ab-family ◄┘                 ▲
                                                      │
 ab-app（装配：启动类 / application.yml / static 前端 / 全局测试）
 ```
@@ -19,6 +20,8 @@ ab-app（装配：启动类 / application.yml / static 前端 / 全局测试）
 | ab-merchant | 商户 CRUD 与查询 | `mer_` | `MerchantApi`、`MerchantChangedEvent` |
 | ab-product | 商品、品牌、标签、规格解析 | `prd_` | `ProductApi`、`ProductChangedEvent` |
 | ab-ocr | `OcrProvider` SPI：llm / mock / noop | – | `OcrApi`、`OcrResult` |
+| ab-user | 用户、会话、短信/第三方登录、登录定位、授权账号（详见 002） | `usr_` | `UserApi`、`CurrentUser`、`UserRegisteredEvent` |
+| ab-family | 家庭、成员、邀请码（详见 002） | `fam_` | `FamilyApi`、`Scope` |
 | ab-receipt | 识别草稿编排、小票 CRUD、图片存储 | `rcp_` | `ReceiptApi`、`ReceiptSavedEvent`、`ReceiptDeletedEvent` |
 | ab-analytics | 投影 + 图表/统计查询 + ETag/缓存 | `ana_` | `AnalyticsApi`（仅内部使用，无外部依赖者） |
 
