@@ -24,7 +24,16 @@ curl localhost:8080/actuator/health   # {"status":"UP"}
 |---|---|
 | 无 key 演示 | 默认 `ab.ocr.provider=auto` → `mock` |
 | 真实识别 | `AB_OCR_API_KEY=sk-... AB_OCR_BASE_URL=https://.../v1 AB_OCR_MODEL=gpt-4o-mini`（auto 自动切到 llm） |
+| 通义（默认） | `AB_OCR_API_KEY=<百炼 key>`；模型用 `AB_OCR_MODEL` 切换，key 所属工作空间需已开通该模型 |
 | 关闭识别 | `--ab.ocr.provider=noop`（得到空表单，手工录入） |
+
+### OCR 排错
+| 日志 | 原因 |
+|---|---|
+| `PKIX path building failed` | JVM 不信任本机代理根证书；启动加 `-Djavax.net.ssl.trustStoreType=KeychainStore -Djavax.net.ssl.trustStore=NONE` |
+| 404 `Model not exist` | 模型名不对，或该工作空间/地域没有此模型；`GET <base-url>/models` 可列出 key 可见的模型 |
+| 403 `Model.AccessDenied` | key 有效但未开通该模型调用权限，到百炼控制台开通 |
+| 401 | key 无效或已轮换 |
 
 ## 使用 Nacos（可选）
 ```bash

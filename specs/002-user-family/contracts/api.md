@@ -15,7 +15,7 @@
 provider ∈ apple/google/wechat/qq/line。
 
 ## 我 `/api/me`
-GET 资料；PUT 更新（nickname/gender/birthDate/country/address）；GET `/accounts` 已绑定账号；GET `/locations` 最近登录定位；POST `/logout`。
+GET 资料；PUT 更新（nickname/gender/birthDate/country/address）；GET `/accounts` 已绑定账号；GET `/locations` 最近登录定位；POST `/logout`；DELETE 注销账号（204；级联删除用户、会话、定位、第三方绑定，并通过 `UserDeletedEvent` 让 family 退出/解散家庭、receipt 删除其全部小票与图片；若是仍有其他成员的家庭创建者则 409 `family.ownerCannotDelete`）。
 
 ## 家庭 `/api/family`
 GET 我的家庭（含成员；无则 204/null）；POST 创建 `{name}`；POST `/join` `{code}`；POST `/leave`；DELETE 解散（OWNER）；DELETE `/members/{userId}` 移出（OWNER）；POST `/invite-code/reset`（OWNER）。

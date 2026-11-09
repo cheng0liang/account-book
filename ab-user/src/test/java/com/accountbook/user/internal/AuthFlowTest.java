@@ -31,7 +31,7 @@ class AuthFlowTest {
     void setUp() {
         db = TestDb.create("user");
         repo = new UserRepository(db.jdbc());
-        var props = new AuthProperties(true, true, 30, null, new AuthProperties.Sms(300, 60, 3), Map.of());
+        var props = new AuthProperties(true, true, 30, null, new AuthProperties.Sms(300, 60, 3, ""), Map.of());
         var accounts = new AccountService(repo, events::add);
         sessions = new SessionService(repo, props);
         auth = new AuthService(repo, accounts, sessions, sentCodes::put, props);
@@ -183,5 +183,58 @@ class AuthFlowTest {
                 .isInstanceOf(IllegalStateException.class);
         assertThat(count("SELECT COUNT(*) FROM usr_user")).isZero();
         assertThat(count("SELECT COUNT(*) FROM usr_auth_account")).isZero();
+    }
+
+    private AuthService withFixedCode(boolean requireLocation) {
+        var props = new AuthProperties(false, requireLocation, 30, null,
+                new AuthProperties.Sms(300, 60, 3, "000000"), Map.of());
+        return new AuthService(repo, new AccountService(repo, events::add), new SessionService(repo, props),
+                sentCodes::put, props);
+    }
+
+    @Test
+    void fixedCodeLogsInAnyPhoneWithoutRequestingACodeAndSendsNoSms() {
+        var fixed = withFixedCode(false);
+        var login = fixed.loginWithSms("+8613800138000", "000000", null, ClientInfo.none());
+        assertThat(login.token()).startsWith("ab_");
+        assertThat(sentCodes).isEmpty();
+        assertThat(fixed.sendCode("+8613800138001").debugCode()).isNull();
+        assertThat(sentCodes).isEmpty();
+        assertThatThrownBy(() -> fixed.loginWithSms("+8613800138000", "123456", null, ClientInfo.none()))
+                .isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void loginWithoutLocationSucceedsWhenLocationIsOptionalAndRecordsNoRow() {
+        withFixedCode(false).loginWithSms("+8613800138000", "000000", null, ClientInfo.none());
+        assertThat(count("SELECT COUNT(*) FROM usr_login_location")).isZero();
+        withFixedCode(false).loginWithSms("+8613800138000", "000000", TOKYO, ClientInfo.none());
+        assertThat(count("SELECT COUNT(*) FROM usr_login_location")).isEqualTo(1);
+    }
+
+    @Test
+    void locationStillBlocksLoginWhenConfiguredAsRequired() {
+        assertThatThrownBy(() -> withFixedCode(true).loginWithSms("+8613800138000", "000000", null, ClientInfo.none()))
+                .isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void deletingTheAccountErasesTheUserSessionsLoginsAndNotifiesOtherModules() {
+        var login = auth.loginWithSms("09011112222", sendCode("09011112222"), TOKYO, ClientInfo.none());
+        auth.loginWithSms("09033334444", sendCode("09033334444"), TOKYO, ClientInfo.none());
+
+        new UserService(repo, events::add).deleteAccount(login.user().id());
+
+        assertThat(events).anyMatch(e -> e instanceof com.accountbook.user.api.event.UserDeletedEvent d
+                && d.userId() == login.user().id());
+        assertThat(sessions.authenticate(login.token())).isEmpty();
+        assertThat(repo.findUser(login.user().id())).isEmpty();
+        assertThat(count("SELECT COUNT(*) FROM usr_user")).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM usr_auth_account")).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM usr_login_location")).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM usr_session")).isEqualTo(1);
+        // the number can be registered again as a brand-new user
+        var again = auth.loginWithSms("09011112222", sendCode("09011112222"), TOKYO, ClientInfo.none());
+        assertThat(again.user().id()).isNotEqualTo(login.user().id());
     }
 }

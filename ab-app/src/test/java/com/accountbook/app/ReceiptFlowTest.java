@@ -42,6 +42,7 @@ class ReceiptFlowTest {
         r.add("ab.ocr.provider", () -> "mock");
         r.add("spring.cloud.nacos.config.server-addr", () -> "127.0.0.1:1");
         r.add("ab.auth.dev-mode", () -> "true");
+        r.add("ab.auth.sms.fixed-code", () -> "");
     }
 
     @Autowired MockMvc mvc;

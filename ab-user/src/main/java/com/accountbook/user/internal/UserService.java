@@ -12,7 +12,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import com.accountbook.user.api.event.UserDeletedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserService implements UserApi {
@@ -23,9 +26,11 @@ public class UserService implements UserApi {
     private static final int ADDRESS_MAX = 200;
 
     private final UserRepository repo;
+    private final ApplicationEventPublisher events;
 
-    UserService(UserRepository repo) {
+    UserService(UserRepository repo, ApplicationEventPublisher events) {
         this.repo = repo;
+        this.events = events;
     }
 
     record ProfileForm(String nickname, String gender, String address, String birthDate, String country) {
@@ -84,6 +89,14 @@ public class UserService implements UserApi {
 
     List<Views.Location> locations(long id, int limit) {
         return repo.locationsOf(id, Math.max(1, Math.min(limit, 200)));
+    }
+
+    /** Erases the account: other modules remove their data via the event, then every user row and session goes. */
+    @Transactional
+    void deleteAccount(long id) {
+        repo.findUser(id).orElseThrow(() -> ApiException.unauthorized("auth.required"));
+        events.publishEvent(new UserDeletedEvent(id));
+        repo.deleteUser(id);
     }
 
     private static UserView view(UserRepository.UserRow r) {

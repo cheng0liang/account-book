@@ -47,6 +47,9 @@ class AuthController {
         body.put("sms", true);
         body.put("providers", oauth.available());
         body.put("requireLocation", props.requireLocation());
+        if (props.devMode() && props.sms().hasFixedCode()) {
+            body.put("testCode", props.sms().fixedCode());
+        }
         return body;
     }
 

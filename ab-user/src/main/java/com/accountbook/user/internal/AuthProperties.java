@@ -17,8 +17,16 @@ public record AuthProperties(
         @DefaultValue Sms sms,
         @DefaultValue Map<String, Client> oauth) {
 
+    /**
+     * {@code fixedCode}: when non-blank, this code is accepted for every phone and no SMS is generated. A stand-in
+     * until an SMS gateway is wired in; it must be blank in any deployment reachable by others.
+     */
     public record Sms(@DefaultValue("300") int codeTtlSeconds, @DefaultValue("60") int resendSeconds,
-                      @DefaultValue("5") int maxAttempts) {
+                      @DefaultValue("5") int maxAttempts, @DefaultValue("") String fixedCode) {
+
+        public boolean hasFixedCode() {
+            return fixedCode != null && !fixedCode.isBlank();
+        }
     }
 
     /** Credentials of one provider; Apple additionally uses teamId/keyId/privateKey (PKCS#8 PEM). */

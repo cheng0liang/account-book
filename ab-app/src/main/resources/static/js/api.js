@@ -102,6 +102,7 @@ export const updateMe = (p) => send('PUT', '/me', p);
 export const myAccounts = () => get('/me/accounts');
 export const myLocations = (limit) => get('/me/locations', { limit });
 export const logout = () => send('POST', '/me/logout');
+export const deleteAccount = () => send('DELETE', '/me');
 
 export const myFamily = () => get('/family');
 export const createFamily = (name) => send('POST', '/family', { name });

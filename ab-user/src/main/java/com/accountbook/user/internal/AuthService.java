@@ -4,6 +4,8 @@ import com.accountbook.common.web.ApiException;
 import com.accountbook.user.internal.oauth.OAuthProfile;
 import java.time.Duration;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 @Service
 class AuthService {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
     private static final Pattern PHONE = Pattern.compile("^\\+?[0-9]{6,15}$");
 
     private final UserRepository repo;
@@ -29,6 +32,10 @@ class AuthService {
         this.sessions = sessions;
         this.sender = sender;
         this.props = props;
+        if (props.sms().hasFixedCode()) {
+            log.warn("ab.auth.sms.fixed-code is set: every phone can log in with it. Use only until an SMS "
+                    + "gateway is connected, never on a public deployment.");
+        }
     }
 
     static String normalizePhone(String raw) {
@@ -49,6 +56,12 @@ class AuthService {
         if (sentAt.isPresent() && now - sentAt.get() < Duration.ofSeconds(props.sms().resendSeconds()).toMillis()) {
             throw ApiException.of(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", "auth.sms.tooFrequent");
         }
+        if (props.sms().hasFixedCode()) {
+            // no code is generated or sent; the resend timer still applies so the UI behaves like the real thing
+            repo.upsertSms(phone, Tokens.sha256(phone + props.sms().fixedCode()), now,
+                    now + Duration.ofSeconds(props.sms().codeTtlSeconds()).toMillis());
+            return new SmsSent(props.sms().resendSeconds(), props.sms().codeTtlSeconds(), null);
+        }
         String code = String.format("%06d", Tokens.randomDigits(1_000_000));
         repo.upsertSms(phone, Tokens.sha256(phone + code), now,
                 now + Duration.ofSeconds(props.sms().codeTtlSeconds()).toMillis());
@@ -67,6 +80,13 @@ class AuthService {
     }
 
     private void verify(String phone, String code) {
+        if (props.sms().hasFixedCode()) {
+            if (!Tokens.constantTimeEquals(Tokens.sha256(props.sms().fixedCode()), Tokens.sha256(code))) {
+                throw ApiException.badRequest("auth.sms.invalid");
+            }
+            repo.deleteSms(phone);
+            return;
+        }
         var row = repo.takeSmsAttempt(phone, props.sms().maxAttempts());
         if (row.isEmpty()) {
             if (repo.smsExists(phone)) {

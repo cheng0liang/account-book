@@ -49,7 +49,7 @@ class ProvidersTest {
     }
 
     private static AuthProperties props(String name, AuthProperties.Client client) {
-        return new AuthProperties(false, true, 30, null, new AuthProperties.Sms(300, 60, 5), Map.of(name, client));
+        return new AuthProperties(false, true, 30, null, new AuthProperties.Sms(300, 60, 5, ""), Map.of(name, client));
     }
 
     private static String b64(String s) {

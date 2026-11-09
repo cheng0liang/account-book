@@ -1,5 +1,5 @@
 import { h, clear } from '../ui/dom.js';
-import { makeField, textInput } from '../ui/form.js';
+import { makeField, textInput, selectEl } from '../ui/form.js';
 import { toast } from '../ui/toast.js';
 import { getLocation } from '../ui/geo.js';
 import * as api from '../api.js';
@@ -7,6 +7,19 @@ import { setSession } from '../auth.js';
 import { setFamily } from '../scope.js';
 import { t, tOr, errorText } from '../i18n/index.js';
 import { replace } from '../router.js';
+import { countryName } from '../format.js';
+import { COUNTRIES, DEFAULT_COUNTRY, countryAt, toInternational } from '../countries.js';
+
+const CC_KEY = 'ab.cc';
+const LOCATE_TIMEOUT_MS = 4000;
+const SUBMIT_WAIT_MS = 1500;
+
+function storedCountry() {
+  try { return localStorage.getItem(CC_KEY); } catch { return null; }
+}
+function rememberCountry(code) {
+  try { localStorage.setItem(CC_KEY, code); } catch { /* storage unavailable */ }
+}
 
 const PROVIDERS = {
   apple: { letter: 'A', cls: 'apple' },
@@ -27,37 +40,52 @@ export async function render(ctx) {
   // the ticket is single use and must not linger in the address bar or history
   if (ticket || error) history.replaceState(null, '', '#/login');
 
-  let cfg = { sms: true, providers: [], requireLocation: true };
+  let cfg = { sms: true, providers: [], requireLocation: false };
   try { cfg = { ...cfg, ...(await api.authProviders()) }; } catch { /* offline: keep defaults */ }
 
   let location = null;
   let locPromise = null;
+  let cc = storedCountry() || DEFAULT_COUNTRY;
+  let ccLocked = Boolean(storedCountry()); // a remembered or manual choice is never overridden by the location guess
   const locText = h('span', { class: 'loc-text' });
   const locRetry = h('button', { class: 'link-btn', type: 'button', hidden: true, onClick: () => locate() }, t('login.locateRetry'));
   const locBar = h('div', { class: 'loc-bar' }, locText, locRetry);
+  const ccSelect = selectEl(COUNTRIES.map((c) => ({ value: c.code, label: `${countryName(c.code)} +${c.dial}` })), cc, (v) => {
+    cc = v;
+    ccLocked = true;
+    rememberCountry(v);
+  });
+  ccSelect.classList.add('cc-select');
 
   function locate() {
     locRetry.hidden = true;
     locText.textContent = t('login.locating');
     locBar.className = 'loc-bar';
-    locPromise = getLocation().then((l) => {
+    locPromise = getLocation({ timeout: LOCATE_TIMEOUT_MS }).then((l) => {
       location = l;
       locText.textContent = t('login.located');
       locBar.className = 'loc-bar ok';
+      const guess = countryAt(l.latitude, l.longitude);
+      if (guess && !ccLocked) {
+        cc = guess;
+        ccSelect.value = guess;
+      }
       return l;
     }).catch((e) => {
       location = null;
-      locText.textContent = tOr(`login.loc.${e.message}`, t('login.loc.unavailable'));
-      locBar.className = 'loc-bar bad';
+      locText.textContent = t('login.locSkipped', { reason: tOr(`login.loc.${e.message}`, t('login.loc.unavailable')) });
       locRetry.hidden = false;
       return null;
     });
     return locPromise;
   }
 
-  // Resolves to the location, or null when it is optional and unavailable; throws when it is required.
+  // The position is best effort: wait briefly for a pending fix, then go on without it unless the server demands it.
   async function needLocation() {
-    if (!location) await (locPromise || locate());
+    if (!location) {
+      const pending = locPromise || locate();
+      await Promise.race([pending, new Promise((r) => setTimeout(r, cfg.requireLocation ? LOCATE_TIMEOUT_MS : SUBMIT_WAIT_MS))]);
+    }
     if (!location && cfg.requireLocation) throw Object.assign(new Error('loc'), { locationRequired: true });
     return location;
   }
@@ -69,9 +97,11 @@ export async function render(ctx) {
   if (error) errBox.textContent = tOr(`login.err.${error}`, t('login.err.failed'));
 
   // phone + code
-  const phone = textInput({ type: 'tel', inputmode: 'tel', placeholder: t('login.phonePlaceholder'), autocomplete: 'tel' });
+  const phone = textInput({ type: 'tel', inputmode: 'tel', placeholder: t('login.phonePlaceholder'), autocomplete: 'tel-national' });
   const code = textInput({ inputmode: 'numeric', maxlength: 8, placeholder: t('login.codePlaceholder'), autocomplete: 'one-time-code' });
-  const hint = h('small', { class: 'field-hint' });
+  const testCode = cfg.testCode;
+  const hint = h('small', { class: 'field-hint' }, testCode ? t('login.devCode', { code: testCode }) : '');
+  const fullPhone = () => toInternational(cc, phone.value.trim());
   let timer = null;
   const sendBtn = h('button', { class: 'btn small', type: 'button', onClick: () => sendCode() }, t('login.sendCode'));
   const loginBtn = h('button', { class: 'btn primary block', type: 'button', onClick: () => submit() }, t('login.submit'));
@@ -95,12 +125,10 @@ export async function render(ctx) {
     if (!phone.value.trim()) { phone.focus(); return; }
     sendBtn.disabled = true;
     try {
-      const r = await api.sendSms(phone.value.trim());
+      rememberCountry(cc);
+      const r = await api.sendSms(fullPhone());
       countdown(r.resendSeconds || 60);
-      if (r.debugCode) {
-        code.value = r.debugCode;
-        hint.textContent = t('login.devCode', { code: r.debugCode });
-      }
+      if (r.debugCode) hint.textContent = t('login.devCode', { code: r.debugCode });
       code.focus();
     } catch (e) {
       sendBtn.disabled = false;
@@ -114,7 +142,8 @@ export async function render(ctx) {
     loginBtn.disabled = true;
     try {
       const loc = await needLocation();
-      await finish(await api.smsLogin(phone.value.trim(), code.value.trim(), loc));
+      rememberCountry(cc);
+      await finish(await api.smsLogin(fullPhone(), code.value.trim(), loc));
     } catch (e) {
       loginBtn.disabled = false;
       fail(e);
@@ -148,7 +177,7 @@ export async function render(ctx) {
       locBar,
       errBox,
       cfg.sms ? h('section', { class: 'card' },
-        makeField(t('login.phone'), phone),
+        makeField(t('login.phone'), h('div', { class: 'phone-row' }, ccSelect, phone)),
         makeField(t('login.code'), h('div', { class: 'code-row' }, code, sendBtn), { hint: null }),
         hint,
         loginBtn) : null,

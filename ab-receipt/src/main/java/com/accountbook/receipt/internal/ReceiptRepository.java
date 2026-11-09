@@ -108,6 +108,14 @@ class ReceiptRepository {
         return jdbc.sql("DELETE FROM rcp_receipt WHERE id = :id").param("id", id).update() > 0;
     }
 
+    record Brief(long id, String imagePath) {
+    }
+
+    List<Brief> briefsOf(long userId) {
+        return jdbc.sql("SELECT id, image_path FROM rcp_receipt WHERE user_id = :u").param("u", userId)
+                .query((rs, i) -> new Brief(rs.getLong("id"), rs.getString("image_path"))).list();
+    }
+
     int claimLegacy(long userId) {
         return jdbc.sql("UPDATE rcp_receipt SET user_id = :uid WHERE user_id = 0").param("uid", userId).update();
     }

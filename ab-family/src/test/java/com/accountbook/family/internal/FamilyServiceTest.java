@@ -178,4 +178,17 @@ class FamilyServiceTest {
         assertThat(mine.members()).hasSize(1);
         assertThat(service.memberUserIds(ALICE)).containsExactly(ALICE);
     }
+
+    @Test
+    void accountDeletionRemovesMembersAndSoleOwnersButBlocksOwnersWithOthers() {
+        service.create(ALICE, "Home");
+        service.join(BOB, service.viewOf(ALICE).orElseThrow().inviteCode());
+
+        assertStatus(() -> service.on(new com.accountbook.user.api.event.UserDeletedEvent(ALICE)),
+                HttpStatus.CONFLICT, "family.ownerCannotDelete");
+        service.on(new com.accountbook.user.api.event.UserDeletedEvent(BOB));
+        assertThat(service.viewOf(BOB)).isEmpty();
+        service.on(new com.accountbook.user.api.event.UserDeletedEvent(ALICE));
+        assertThat(service.viewOf(ALICE)).isEmpty();
+    }
 }

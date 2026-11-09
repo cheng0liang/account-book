@@ -112,6 +112,7 @@ body.no-tabbar #view { padding-bottom: 0; }
 }
 .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.danger-outline { background: transparent; border-color: var(--danger); color: var(--danger); margin-top: 10px; }
 .btn.small { min-height: 44px; padding: 0 14px; font-size: 14px; }
 .btn.block { display: flex; width: 100%; }
 .btn.grow { flex: 1; }
@@ -383,3 +384,12 @@ a.list-row:active, a.receipt-row:active { background: var(--primary-weak); }
 .invite-code { font-size: 30px; font-weight: 700; letter-spacing: 6px; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
 .row-actions { display: flex; justify-content: center; gap: 8px; }
 .owner-line { color: var(--text-2); font-size: 12px; }
+
+.phone-row { display: flex; gap: 8px; }
+.phone-row .input { flex: 1; min-width: 0; }
+.phone-row .cc-select { flex: 0 0 auto; width: auto; max-width: 46%; }
+
+.me-card { display: flex; align-items: center; gap: 14px; }
+.me-meta { min-width: 0; font-size: 13px; }
+.me-nick { font-size: 18px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avatar { flex: 0 0 56px; width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--primary, #3b82f6); color: #fff; font-size: 24px; font-weight: 700; }

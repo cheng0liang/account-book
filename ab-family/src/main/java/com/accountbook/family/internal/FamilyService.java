@@ -4,10 +4,12 @@ import com.accountbook.common.web.ApiException;
 import com.accountbook.family.api.FamilyApi;
 import com.accountbook.user.api.UserApi;
 import com.accountbook.user.api.UserView;
+import com.accountbook.user.api.event.UserDeletedEvent;
 import java.security.SecureRandom;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,21 @@ public class FamilyService implements FamilyApi {
     FamilyService(FamilyRepository repo, UserApi users) {
         this.repo = repo;
         this.users = users;
+    }
+
+    /** Account deletion: members just leave, a sole owner takes the family with them, an owner with others is blocked. */
+    @EventListener
+    void on(UserDeletedEvent e) {
+        repo.familyIdOf(e.userId()).ifPresent(familyId -> {
+            var family = repo.find(familyId).orElseThrow();
+            if (family.ownerId() != e.userId()) {
+                repo.deleteMember(familyId, e.userId());
+            } else if (repo.memberCount(familyId) > 1) {
+                throw ApiException.conflict("family.ownerCannotDelete");
+            } else {
+                repo.deleteFamily(familyId);
+            }
+        });
     }
 
     @Override

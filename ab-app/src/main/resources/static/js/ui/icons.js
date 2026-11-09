@@ -5,6 +5,7 @@ const PATHS = {
   chart: '<path d="M5 20V11M12 20V4M19 20v-6"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   book: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/>',
   settings: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
   chevronLeft: '<path d="M15 5l-7 7 7 7"/>',
   chevronRight: '<path d="M9 5l7 7-7 7"/>',

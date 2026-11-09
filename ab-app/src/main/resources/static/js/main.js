@@ -20,10 +20,10 @@ addRoute('/merchant/new', () => import('./pages/merchant-edit.js'), { tab: 'libr
 addRoute('/merchant/:id', () => import('./pages/merchant-edit.js'), { tab: 'library', hideTabbar: true });
 addRoute('/product/new', () => import('./pages/product-edit.js'), { tab: 'library', hideTabbar: true });
 addRoute('/product/:id', () => import('./pages/product-edit.js'), { tab: 'library', hideTabbar: true });
-addRoute('/login', () => import('./pages/login.js'), { tab: 'settings', hideTabbar: true });
-addRoute('/profile', () => import('./pages/profile.js'), { tab: 'settings' });
-addRoute('/family', () => import('./pages/family.js'), { tab: 'settings' });
-addRoute('/settings', () => import('./pages/settings.js'), { tab: 'settings' });
+addRoute('/login', () => import('./pages/login.js'), { tab: 'me', hideTabbar: true });
+addRoute('/profile', () => import('./pages/profile.js'), { tab: 'me' });
+addRoute('/family', () => import('./pages/family.js'), { tab: 'me' });
+addRoute('/settings', () => import('./pages/settings.js'), { tab: 'me' });
 
 const app = document.getElementById('app');
 const view = document.getElementById('view');

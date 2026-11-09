@@ -17,6 +17,7 @@ import com.accountbook.receipt.api.event.ReceiptDeletedEvent;
 import com.accountbook.receipt.api.event.ReceiptSavedEvent;
 import com.accountbook.user.api.UserApi;
 import com.accountbook.user.api.UserView;
+import com.accountbook.user.api.event.UserDeletedEvent;
 import com.accountbook.user.api.event.UserRegisteredEvent;
 import java.util.Collection;
 import java.util.HashMap;
@@ -61,6 +62,18 @@ class ReceiptService implements ReceiptApi {
     void on(UserRegisteredEvent e) {
         if (e.first()) {
             repo.claimLegacy(e.userId());
+        }
+    }
+
+    /** Account deletion: the user's receipts (and their images) go with them. */
+    @EventListener
+    void on(UserDeletedEvent e) {
+        for (var r : repo.briefsOf(e.userId())) {
+            repo.delete(r.id());
+            events.publishEvent(new ReceiptDeletedEvent(r.id()));
+            if (r.imagePath() != null) {
+                afterCommit(() -> images.delete(r.imagePath()));
+            }
         }
     }
 

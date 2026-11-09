@@ -168,6 +168,20 @@ class ReceiptServiceTest {
     }
 
     @Test
+    void accountDeletionRemovesOnlyThatUsersReceiptsAndPublishesDeletions() {
+        var mine = createAs(ME, form("JPY", item("牛奶", "1", "100", null)));
+        var theirs = createAs(PARTNER, form("JPY", item("面包", "1", "100", null)));
+        events.clear();
+
+        tx.executeWithoutResult(s -> service.on(new com.accountbook.user.api.event.UserDeletedEvent(ME)));
+
+        assertThat(repo.findById(mine.id())).isEmpty();
+        assertThat(repo.items(mine.id())).isEmpty();
+        assertThat(repo.findById(theirs.id())).isPresent();
+        assertThat(events).filteredOn(ReceiptDeletedEvent.class::isInstance).hasSize(1);
+    }
+
+    @Test
     void listFiltersByDateMerchantAndTextAndOrdersNewestFirst() {
         var older = new ReceiptForm(null, merchant("西友"), "2026-10-01T09:00", "JPY", null, null, null, null, null, null,
                 null, null, List.of(item("牛奶", "1", "100", null)), null);

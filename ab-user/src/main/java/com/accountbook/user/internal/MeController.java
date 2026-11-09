@@ -5,6 +5,7 @@ import com.accountbook.user.internal.UserService.ProfileForm;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -44,6 +45,12 @@ class MeController {
     @GetMapping("/locations")
     List<Views.Location> locations(@RequestParam(defaultValue = "20") int limit) {
         return users.locations(CurrentUser.id(), limit);
+    }
+
+    @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void deleteAccount() {
+        users.deleteAccount(CurrentUser.id());
     }
 
     @PostMapping("/logout")

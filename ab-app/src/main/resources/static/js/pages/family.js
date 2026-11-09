@@ -37,7 +37,7 @@ export async function render(ctx) {
     const fName = makeField(t('family.name'), name);
     const fCode = makeField(t('family.inviteCode'), code);
     root.append(
-      pageHeader({ title: t('family.title'), back: '#/settings' }),
+      pageHeader({ title: t('family.title'), back: '#/profile' }),
       h('div', { class: 'page-body' },
         h('p', { class: 'muted' }, t('family.intro')),
         h('section', { class: 'card' },
@@ -65,7 +65,7 @@ export async function render(ctx) {
       : null));
 
   root.append(
-    pageHeader({ title: family.name || t('family.title'), back: '#/settings' }),
+    pageHeader({ title: family.name || t('family.title'), back: '#/profile' }),
     h('div', { class: 'page-body' },
       h('section', { class: 'card invite' },
         h('small', { class: 'muted' }, t('family.inviteCode')),

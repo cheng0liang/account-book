@@ -77,7 +77,7 @@ class OAuthFlowTest {
     };
 
     private void build(boolean devMode, String publicBase) {
-        var props = new AuthProperties(devMode, true, 30, publicBase, new AuthProperties.Sms(300, 60, 5), Map.of());
+        var props = new AuthProperties(devMode, true, 30, publicBase, new AuthProperties.Sms(300, 60, 5, ""), Map.of());
         accounts = new AccountService(repo, events::add);
         sessions = new SessionService(repo, props);
         oauth = new OAuthService(List.of(fake, unconfigured), repo, accounts, sessions, props);
@@ -243,7 +243,7 @@ class OAuthFlowTest {
 
     @Test
     void profileUpdateValidatesEveryField() {
-        var users = new UserService(repo);
+        var users = new UserService(repo, e -> { });
         long id = accounts.resolveOrRegister("PHONE", new OAuthProfile("0901", null, null, null, null, null), "0901");
 
         var saved = users.update(id, new UserService.ProfileForm(" Tom ", "male", "Shibuya", "1990-05-01", "jp"));

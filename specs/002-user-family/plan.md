@@ -20,5 +20,8 @@ DAG：`common ← merchant/product/ocr/user ← family ← receipt ← analytics
 
 ## 安全
 - 令牌、验证码、ticket 均只存哈希；ticket 单次且短时有效；state 一次性。
+- 固定验证码 `ab.auth.sms.fixed-code`（`AB_SMS_FIXED_CODE`，默认 `000000`）：任意手机号可凭它登录，不发短信；`/api/auth/providers` 仅在 dev-mode 下返回 `testCode`。对接短信网关时清空即可。
+- 定位 `ab.auth.require-location` 默认 false：成功才写 `usr_login_location`，失败不阻断登录。
+- 注销账号：`UserService.deleteAccount` 在单个事务内发布 `UserDeletedEvent`（family/receipt 同步监听，analytics 经 `ReceiptDeletedEvent` 更新投影），再删除 usr_* 数据。
 - 对外部署必须 `AB_AUTH_DEV=false`，并设置 `AB_PUBLIC_BASE_URL` 与各提供商凭据。
 - 浏览器定位需要 HTTPS（localhost 除外）。

@@ -1,4 +1,5 @@
 # 任务（均已完成）
+- [x] 注销账号（`DELETE /api/me` + `UserDeletedEvent`）、手机号+区号登录、定位可选、「我的」页
 - [x] ab-user：迁移、用户/会话/短信/OAuth/定位、拦截器、`/api/auth`、`/api/me`
 - [x] ab-family：迁移、家庭 API、`Scope`
 - [x] receipt/analytics：`user_id` 迁移、遗留数据认领、scope 过滤、缓存键含 uid、REVISION=2

@@ -9,7 +9,7 @@ export JAVA_HOME=/Library/Java/JavaVirtualMachines/open-jdk-17.0.12.0
 export MAVEN_OPTS="-Djavax.net.ssl.trustStoreType=KeychainStore -Djavax.net.ssl.trustStore=NONE"
 mvn -s /tmp/ab-settings.xml -o clean install     # 离线 + 本机设置；无该 settings 时去掉 -s/-o
 node ab-app/src/test/frontend/i18n-check.mjs     # 三语言 key 一致 + JS 语法检查
-java -jar ab-app/target/account-book.jar         # :8080
+java -jar ab-app/target/account-book.jar         # :8080；本机代理环境调 OCR 需加 MAVEN_OPTS 里同样的 -Djavax.net.ssl.trustStore* 参数，否则 PKIX 报错
 ```
 
 - 打 ab-app 必须 `clean package`，否则会留下旧的 repackage jar。
@@ -40,6 +40,8 @@ java -jar ab-app/target/account-book.jar         # :8080
 - 小票/分析行带 `user_id`（0=遗留，首个注册用户认领）；读取用 `Scope.parse(p).userIds(familyApi, uid)`，分析缓存键/ETag 含 uid 列表；改用户相关投影逻辑要 bump `ProjectionService.REVISION`。
 - 改小票仅限本人（403 `receipt.ownerOnly`），同家庭可读，其他人 404。
 - `ab.auth.dev-mode` 开启时验证码回显 + 第三方 mock；生产必须关。第三方真实流程与短信网关无法在本地验证。
+- 固定验证码 `AB_SMS_FIXED_CODE`（默认 `000000`，仅临时）；生产必须置空。定位 `AB_AUTH_REQUIRE_LOCATION` 默认 false（尽力而为，失败不阻断登录）。
+- 注销账号 `DELETE /api/me`：`UserService.deleteAccount` 在事务内发布 `UserDeletedEvent`，family/receipt 监听并清理自己的数据（有其他成员的家庭创建者 409 `family.ownerCannotDelete`）；新增含用户数据的模块必须监听该事件。
 - 前端：`auth.js` 存会话，`scope.js` 存家庭与范围；`<img>` 带不了 Authorization，图片走 `api.fetchBlobUrl`。
 
 ## 前端

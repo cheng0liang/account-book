@@ -91,6 +91,16 @@ class UserRepository {
                 .param("birth", birthDate).param("country", country).param("now", now).param("id", id).update();
     }
 
+    /** Removes the user and everything keyed by them; sessions and login records go with it. */
+    void deleteUser(long id) {
+        jdbc.sql("DELETE FROM usr_sms_code WHERE phone = (SELECT phone FROM usr_user WHERE id = :id)")
+                .param("id", id).update();
+        for (String table : List.of("usr_session", "usr_login_location", "usr_auth_account", "usr_login_ticket")) {
+            jdbc.sql("DELETE FROM " + table + " WHERE user_id = :id").param("id", id).update();
+        }
+        jdbc.sql("DELETE FROM usr_user WHERE id = :id").param("id", id).update();
+    }
+
     void touchLogin(long id, long now) {
         jdbc.sql("UPDATE usr_user SET last_login_at = :now WHERE id = :id").param("now", now).param("id", id).update();
     }

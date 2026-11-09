@@ -7,7 +7,7 @@ const TABS = [
   { name: 'analytics', href: '#/analytics', label: tk('tab.analytics'), icon: 'chart' },
   { name: 'scan', href: '#/scan', label: tk('tab.scan'), icon: 'plus', add: true },
   { name: 'library', href: '#/library', label: tk('tab.library'), icon: 'book' },
-  { name: 'settings', href: '#/settings', label: tk('tab.settings'), icon: 'settings' },
+  { name: 'me', href: '#/profile', label: tk('tab.me'), icon: 'user' },
 ];
 
 export function createTabbar() {

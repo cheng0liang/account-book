@@ -7,9 +7,11 @@
 
 ## ab-user
 - `usr_user`：id、nickname、phone（唯一，可空）、gender（UNKNOWN/MALE/FEMALE/OTHER）、address、birth_date、country、avatar_url、status、时间戳。
-- `usr_login_location`（用户定位关联表）：user_id、provider、latitude、longitude、accuracy_m、**located_at**、ip、user_agent。每次登录一行。
+- `usr_login_location`（用户定位关联表）：user_id、provider、latitude、longitude、accuracy_m、**located_at**、ip、user_agent。登录时定位成功才写一行；账号注销时删除。
 - `usr_auth_account`（账户授权登录关联表）：user_id、provider（APPLE/GOOGLE/WECHAT/QQ/LINE；手机号登录对应 usr_user.phone）、provider_uid、union_id、nickname、email、avatar_url、raw_profile；`UNIQUE(provider, provider_uid)`。
 - `usr_session` / `usr_sms_code` / `usr_oauth_state` / `usr_login_ticket`：登录过程状态，均只存哈希。
+
+- 注销账号（`UserService.deleteAccount`）：同一事务内先发布 `UserDeletedEvent`（family 退出/解散、receipt 删除小票并发布 `ReceiptDeletedEvent` 更新分析投影），再删除 usr_* 行（含该手机号的 `usr_sms_code`）。
 
 ## ab-family
 - `fam_family`：id、name、owner_id、invite_code（唯一）、created_at。
